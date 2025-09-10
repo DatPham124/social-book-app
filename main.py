@@ -1,4 +1,3 @@
-# main.py
 from datetime import timedelta
 from typing import Annotated
 
@@ -8,11 +7,10 @@ from sqlmodel import SQLModel, Session
 
 from .config import ACCESS_TOKEN_EXPIRE_MINUTES
 from .database import engine, get_session
-from .model import User
+from .model import User, Password_Update
 from . import auth
 app = FastAPI()
 
-# Khởi tạo DB khi chạy app
 @app.on_event("startup")
 def on_startup():
     SQLModel.metadata.create_all(engine)
@@ -50,3 +48,22 @@ async def read_users_me(
     current_user: Annotated[User, Depends(auth.get_current_active_user)],
 ):
     return current_user
+
+@app.put("/user/me/password")
+def update_password(
+    password_data: Password_Update,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(auth.get_current_active_user)
+):
+    if not auth.verify_password(password_data.old_password, current_user.hashed_password):
+        raise HTTPException(status_code=400,
+                            detail="Old password is incorrect")
+    new_hashed_password = auth.get_password_hash(password_data.new_password)
+    current_user.hashed_password = new_hashed_password
+
+
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+
+    return {"msg": "Password updated successfully"}

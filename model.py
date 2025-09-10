@@ -1,6 +1,7 @@
 # models.py
 from datetime import datetime
 from typing import Optional
+from pydantic import BaseModel
 from sqlmodel import SQLModel, Field
 
 class User(SQLModel, table=True):
@@ -10,3 +11,7 @@ class User(SQLModel, table=True):
     hashed_password: str
     disabled: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Password_Update(BaseModel):
+    old_password: str
+    new_password: str
