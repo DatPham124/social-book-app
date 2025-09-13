@@ -8,7 +8,37 @@ from sqlmodel import select, Session
 
 from .config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, pwd_context, oauth2_scheme
 from .database import get_session
-from .model import User
+from .model import User, User_role, Role
+
+def get_role(user_id: int, session: Session): # Lay role nguoi dung khi chua co token
+    stmt = (
+        select(Role.role_name)
+        .join(User_role, User_role.role_id == Role.role_id)
+        .where(User_role.user_id == user_id)
+    )
+
+    role_name = session.exec(stmt).all()
+
+    return role_name
+
+def decode_role_token(token: Annotated[str, Depends(oauth2_scheme)]):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        roles = payload.get("roles", [])
+        return roles
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+def require_admin(roles: list[str] = Depends(decode_role_token)):
+    if "admin" not in roles:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    return roles
+
+
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)

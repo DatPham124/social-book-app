@@ -9,4 +9,4 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 MYSQL_URL = "mysql+pymysql://user-service:user-service@34.9.73.53:3306/user_service_db"
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/token")
