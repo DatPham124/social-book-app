@@ -6,9 +6,19 @@ from fastapi import Depends, HTTPException, status
 from jwt.exceptions import InvalidTokenError
 from sqlmodel import select, Session
 
-from .config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, pwd_context, oauth2_scheme
-from .database import get_session
+from common_lib.config import pwd_context, oauth2_scheme
+from common_lib.database import get_session_user_service
 from .model import User, User_role, Role
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")
+
+
 
 def get_role(user_id: int, session: Session): # Lay role nguoi dung khi chua co token
     stmt = (
@@ -20,25 +30,6 @@ def get_role(user_id: int, session: Session): # Lay role nguoi dung khi chua co 
     role_name = session.exec(stmt).all()
 
     return role_name
-
-def decode_role_token(token: Annotated[str, Depends(oauth2_scheme)]):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        roles = payload.get("roles", [])
-        return roles
-    except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-def require_admin(roles: list[str] = Depends(decode_role_token)):
-    if "admin" not in roles:
-        raise HTTPException(status_code=403, detail="Permission denied")
-    return roles
-
-
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -57,15 +48,15 @@ def authenticate_user(session: Session, username: str, password: str) -> Optiona
         return None
     return user
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict, expires_delta: int | None = None):
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
+    expire = datetime.now(timezone.utc) + (expires_delta or 15)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session_user_service)
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

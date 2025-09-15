@@ -5,15 +5,20 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jwt import PyJWTError
 from sqlmodel import Session
-from ..config import ACCESS_TOKEN_EXPIRE_MINUTES
-from ..database import engine, get_session
+from common_lib.database import engine_user_srevice, get_session_user_service
 from ..model import Role, User, Password_Update, User_role
 from .. import auth
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("/register", response_model=User)
-def register(user: User, session: Session = Depends(get_session)):
+def register(user: User, session: Session = Depends(get_session_user_service)):
     plain_password = user.hashed_password
     user.hashed_password = auth.get_password_hash(plain_password)
 
@@ -37,7 +42,7 @@ def register(user: User, session: Session = Depends(get_session)):
 @router.post("/token")
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session_user_service)
 ):
     user = auth.authenticate_user(session, form_data.username, form_data.password)
     if not user:
@@ -73,7 +78,7 @@ async def read_users_me(
 @router.put("/users/me/password")
 def update_password(
     password_data: Password_Update,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_session_user_service),
     current_user: User = Depends(auth.get_current_active_user)
 ):
     if not auth.verify_password(password_data.old_password, current_user.hashed_password):

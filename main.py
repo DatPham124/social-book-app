@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from .routes import users, admin, profiles
-from .database import engine
+from common_lib.database import engine_book_service
 from sqlmodel import SQLModel, Session, select
 from .model import Role
 
@@ -9,8 +9,8 @@ app = FastAPI()
 @app.on_event("startup")
 def on_startup():
 
-    SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
+    SQLModel.metadata.create_all(engine_book_service)
+    with Session(engine_book_service) as session:
         existing_roles = session.exec(select(Role)).all()
         if not existing_roles:
             roles = [

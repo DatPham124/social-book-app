@@ -1,7 +1,7 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
-from ..database import get_session
+from common_lib.database import get_session_user_service
 from ..model import Profile, User
 from .. import auth
 
@@ -9,7 +9,7 @@ router = APIRouter(prefix="/users", tags=["profiles"], dependencies=[Depends(aut
 
 @router.post ("/profile/add")
 def create_profile(profile: Profile, 
-                   session:Session = Depends(get_session),
+                   session:Session = Depends(get_session_user_service),
                    current_user: User = Depends(auth.get_current_active_user)):
     
     existing_profile = session.get(Profile, current_user.id)
@@ -29,7 +29,7 @@ def create_profile(profile: Profile,
 
 @router.put("/profile/update")
 def update_profile(profile_data: Profile, 
-                   session:Session = Depends(get_session),
+                   session:Session = Depends(get_session_user_service),
                    current_user: User = Depends(auth.get_current_active_user)):
     
     profile = session.get(Profile, current_user.id)
@@ -53,7 +53,7 @@ def update_profile(profile_data: Profile,
     return profile
 
 @router.get("/profile", response_model=Profile)
-def get_profile(session:Session = Depends(get_session),
+def get_profile(session:Session = Depends(get_session_user_service),
                    current_user: User = Depends(auth.get_current_active_user)):
     
     profile = session.get(Profile, current_user.id)
@@ -66,7 +66,7 @@ def get_profile(session:Session = Depends(get_session),
     return profile
 
 @router.get("/profile/{user_id}", response_model=Profile)
-def get_profile(user_id, session: Session = Depends(get_session)):
+def get_profile(user_id, session: Session = Depends(get_session_user_service)):
     user_uuid = uuid.UUID(user_id)
     profile = session.get(Profile, user_uuid)
     if not profile:

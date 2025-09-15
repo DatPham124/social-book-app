@@ -1,9 +1,10 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
+
+from common_lib.auth import require_admin
+from common_lib.database import get_session_user_service
 from ..model import User_role, Role
-from ..database import get_session
-from ..auth import require_admin
 
 router = APIRouter(
     prefix="/users/admin",
@@ -12,7 +13,7 @@ router = APIRouter(
 )
 
 @router.post("/assign/role", response_model=User_role)
-def assign_role(user_role_data: User_role, session: Session = Depends(get_session)):
+def assign_role(user_role_data: User_role, session: Session = Depends(get_session_user_service)):
     user_uuid = uuid.UUID(user_role_data.user_id)
     role_uuid = uuid.UUID(user_role_data.role_id)
 
@@ -35,7 +36,7 @@ def assign_role(user_role_data: User_role, session: Session = Depends(get_sessio
 
 
 @router.delete("/assign/delete/{assign_id}")
-def delete_user_role(assign_id: int, session: Session = Depends(get_session)):
+def delete_user_role(assign_id: int, session: Session = Depends(get_session_user_service)):
     user_role = session.get(User_role, assign_id)
     if not user_role:
         raise HTTPException(status_code=404, detail="User role not found")
@@ -46,7 +47,7 @@ def delete_user_role(assign_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/add/role", response_model=Role)
-def add_role(role_data: Role, session: Session = Depends(get_session)):
+def add_role(role_data: Role, session: Session = Depends(get_session_user_service)):
     statement = select(Role).where(Role.role_name == role_data.role_name)
     existing = session.exec(statement).first()
     if existing:
@@ -59,7 +60,7 @@ def add_role(role_data: Role, session: Session = Depends(get_session)):
 
 
 @router.delete("/delete/role{role_id}")
-def delete_role(role_id, session: Session = Depends(get_session)):
+def delete_role(role_id, session: Session = Depends(get_session_user_service)):
     role_id_uuid = uuid.UUID(role_id)
 
     role = session.get(Role, role_id_uuid)
