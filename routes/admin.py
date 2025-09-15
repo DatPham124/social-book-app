@@ -6,12 +6,12 @@ from ..database import get_session
 from ..auth import require_admin
 
 router = APIRouter(
-    prefix="/users/role",
+    prefix="/users/admin",
     tags=["role"],
     dependencies=[Depends(require_admin)]
 )
 
-@router.post("/assign", response_model=User_role)
+@router.post("/assign/role", response_model=User_role)
 def assign_role(user_role_data: User_role, session: Session = Depends(get_session)):
     user_uuid = uuid.UUID(user_role_data.user_id)
     role_uuid = uuid.UUID(user_role_data.role_id)
@@ -45,7 +45,7 @@ def delete_user_role(assign_id: int, session: Session = Depends(get_session)):
     return {"detail": f"User role with ID {assign_id} deleted successfully"}
 
 
-@router.post("/add", response_model=Role)
+@router.post("/add/role", response_model=Role)
 def add_role(role_data: Role, session: Session = Depends(get_session)):
     statement = select(Role).where(Role.role_name == role_data.role_name)
     existing = session.exec(statement).first()
@@ -58,7 +58,7 @@ def add_role(role_data: Role, session: Session = Depends(get_session)):
     return role_data
 
 
-@router.delete("/delete/{role_id}")
+@router.delete("/delete/role{role_id}")
 def delete_role(role_id, session: Session = Depends(get_session)):
     role_id_uuid = uuid.UUID(role_id)
 

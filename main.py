@@ -1,8 +1,8 @@
 from fastapi import FastAPI
-from .routes import users, user_role, profiles
+from .routes import users, admin, profiles
 from .database import engine
 from sqlmodel import SQLModel, Session, select
-from .model import Role, User_role
+from .model import Role
 
 app = FastAPI()
 
@@ -24,4 +24,4 @@ def on_startup():
 
 app.include_router(users.router)
 app.include_router(profiles.router)
-app.include_router(user_role.router)
+app.include_router(admin.router)
