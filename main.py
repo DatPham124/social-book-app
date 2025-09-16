@@ -1,6 +1,6 @@
 from fastapi import Depends, FastAPI
 from common_lib.database import  engine_book_service
-from .routes import books
+from .routes import books, author
 from sqlmodel import SQLModel, Session, select
 
 app = FastAPI()
@@ -11,3 +11,4 @@ def on_startup():
 
 
 app.include_router(books.router)
+app.include_router(author.router)
