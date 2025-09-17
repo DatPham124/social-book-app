@@ -24,3 +24,4 @@ class Comments(SQLModel, table=True):
     review_id: int = Field(nullable=False, index=True, foreign_key="reviews.id")
     user_id: int = Field(nullable=False, index=True)
     content: str = Field(nullable=False)
+    update_at: date = Field(default_factory=date)
