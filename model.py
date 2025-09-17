@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Enum, UniqueConstraint
 from sqlmodel import SQLModel, Field
 
 
@@ -37,6 +37,10 @@ class Password_Update(BaseModel):
     old_password: str
     new_password: str
 
+class FriendRequest(str, Enum):
+    pending = "pending"
+    accepted = "accepted"
+    rejected = "rejected"   
 
 class Friends(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("user_id", "friend_id"),)
@@ -45,4 +49,4 @@ class Friends(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id")
     friend_id: int = Field(foreign_key="user.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    status: str = Field(default="pending")  # pending, accepted, rejected
+    status: str = Field(default=FriendRequest.pending)  # pending, accepted, rejected
