@@ -1,0 +1,25 @@
+from datetime import date
+from typing import Optional
+from sqlmodel import SQLModel, Field, UniqueConstraint
+
+
+class Reviews(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("user_id", "book_id"),) 
+    id: Optional[int] = Field(default=None, primary_key= True)
+    user_id: int = Field(nullable=False, index=True)
+    book_id: int = Field(nullable=False, index=True)
+    rating: int = Field(nullable=False, index=True)
+    content: Optional[str] = None
+    created_at: date = Field(default_factory=date)
+
+class Likes(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key= True)
+    user_id: int = Field(nullable=False, index=True)
+    review_id: int = Field(nullable=False, index=True, foreign_key="reviews.id")
+    created_at: date = Field(default_factory=date)
+
+class Comments(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True, index=True)
+    review_id: int = Field(nullable=False, index=True, foreign_key="reviews.id")
+    user_id: int = Field(nullable=False, index=True)
+    content: str = Field(nullable=False)
