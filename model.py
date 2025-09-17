@@ -13,6 +13,7 @@ class Reviews(SQLModel, table=True):
     created_at: date = Field(default_factory=date)
 
 class Likes(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("user_id", "review_id"),) 
     id: Optional[int] = Field(default=None, primary_key= True)
     user_id: int = Field(nullable=False, index=True)
     review_id: int = Field(nullable=False, index=True, foreign_key="reviews.id")
