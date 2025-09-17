@@ -1,22 +1,26 @@
-import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from common_lib.database import get_session_user_service
 from ..model import Profile, User
 from .. import auth
 
-router = APIRouter(prefix="/users", tags=["profiles"], dependencies=[Depends(auth.get_current_active_user)])
+router = APIRouter(
+    prefix="/users",
+    tags=["profiles"],
+    dependencies=[Depends(auth.get_current_active_user)]
+)
 
-@router.post ("/profile/add")
-def create_profile(profile: Profile, 
-                   session:Session = Depends(get_session_user_service),
-                   current_user: User = Depends(auth.get_current_active_user)):
-    
+@router.post("/profile/add")
+def create_profile(
+    profile: Profile,
+    session: Session = Depends(get_session_user_service),
+    current_user: User = Depends(auth.get_current_active_user)
+):
     existing_profile = session.get(Profile, current_user.id)
 
     if existing_profile:
         raise HTTPException(
-            status_code=400, detail="Profile aleready exists for this user"
+            status_code=400, detail="Profile already exists for this user"
         )
 
     profile.user_id = current_user.id
@@ -27,11 +31,13 @@ def create_profile(profile: Profile,
 
     return profile
 
+
 @router.put("/profile/update")
-def update_profile(profile_data: Profile, 
-                   session:Session = Depends(get_session_user_service),
-                   current_user: User = Depends(auth.get_current_active_user)):
-    
+def update_profile(
+    profile_data: Profile,
+    session: Session = Depends(get_session_user_service),
+    current_user: User = Depends(auth.get_current_active_user)
+):
     profile = session.get(Profile, current_user.id)
 
     if profile is None:
@@ -52,10 +58,12 @@ def update_profile(profile_data: Profile,
 
     return profile
 
+
 @router.get("/profile", response_model=Profile)
-def get_profile(session:Session = Depends(get_session_user_service),
-                   current_user: User = Depends(auth.get_current_active_user)):
-    
+def get_profile(
+    session: Session = Depends(get_session_user_service),
+    current_user: User = Depends(auth.get_current_active_user)
+):
     profile = session.get(Profile, current_user.id)
 
     if profile is None:
@@ -65,10 +73,13 @@ def get_profile(session:Session = Depends(get_session_user_service),
     
     return profile
 
+
 @router.get("/profile/{user_id}", response_model=Profile)
-def get_profile(user_id, session: Session = Depends(get_session_user_service)):
-    user_uuid = uuid.UUID(user_id)
-    profile = session.get(Profile, user_uuid)
+def get_profile_by_id(
+    user_id: int,
+    session: Session = Depends(get_session_user_service)
+):
+    profile = session.get(Profile, user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile

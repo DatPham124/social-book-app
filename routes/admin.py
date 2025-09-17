@@ -1,4 +1,3 @@
-import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
@@ -12,15 +11,9 @@ router = APIRouter(
     dependencies=[Depends(require_admin)]
 )
 
+# Gán role cho user
 @router.post("/assign/role", response_model=User_role)
 def assign_role(user_role_data: User_role, session: Session = Depends(get_session_user_service)):
-    user_uuid = uuid.UUID(user_role_data.user_id)
-    role_uuid = uuid.UUID(user_role_data.role_id)
-
-    user_role_data.user_id = user_uuid
-    user_role_data.role_id = role_uuid
-
-    
     statement = select(User_role).where(
         User_role.user_id == user_role_data.user_id,
         User_role.role_id == user_role_data.role_id
@@ -35,6 +28,7 @@ def assign_role(user_role_data: User_role, session: Session = Depends(get_sessio
     return user_role_data
 
 
+# Xoá role của user
 @router.delete("/assign/delete/{assign_id}")
 def delete_user_role(assign_id: int, session: Session = Depends(get_session_user_service)):
     user_role = session.get(User_role, assign_id)
@@ -46,6 +40,7 @@ def delete_user_role(assign_id: int, session: Session = Depends(get_session_user
     return {"detail": f"User role with ID {assign_id} deleted successfully"}
 
 
+# Tạo role mới
 @router.post("/add/role", response_model=Role)
 def add_role(role_data: Role, session: Session = Depends(get_session_user_service)):
     statement = select(Role).where(Role.role_name == role_data.role_name)
@@ -59,13 +54,10 @@ def add_role(role_data: Role, session: Session = Depends(get_session_user_servic
     return role_data
 
 
-@router.delete("/delete/role{role_id}")
-def delete_role(role_id, session: Session = Depends(get_session_user_service)):
-    role_id_uuid = uuid.UUID(role_id)
-
-    role = session.get(Role, role_id_uuid)
-
-    Role.role_id = role_id_uuid
+# Xoá role theo ID
+@router.delete("/delete/role/{role_id}")
+def delete_role(role_id: int, session: Session = Depends(get_session_user_service)):
+    role = session.get(Role, role_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
 
