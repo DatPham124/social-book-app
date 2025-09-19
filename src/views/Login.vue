@@ -27,8 +27,6 @@ import LoginForm from '../components/LoginForm.vue';
 
         <LoginForm />
 
-        <p v-if="errorMessages" class="text-red-500">{{ errorMessages }}</p>
-
         <p class="text-sm text-gray-600 mt-4 text-center">
           Don't have an account?
           <a href="#" class="text-blue-500 hover:underline">Register</a>
