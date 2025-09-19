@@ -1,3 +1,7 @@
+<script setup lang="ts">
+import LoginForm from '../components/LoginForm.vue';
+</script>
+
 <template>
   <div class="relative bg-[#F3F4F6]">
     <div class="w-full h-65 bg-yellow-400 absolute z-0 mt-19"></div>
@@ -5,11 +9,11 @@
     <div class="relative mx-auto min-h-screen w-5xl z-10">
       <h1 class=" left-2 text-3xl font-logo z-10 p-5">📚 Social Book</h1>
 
-      <img src="../../assets/login_2.png" alt="Books Background" class="h-65 relative" />
+      <img src="../assets/login_2.png" alt="Books Background" class="h-65 relative" />
 
 
       <div class="flex justify-between">
-        <img src="../../assets/login_3.png" alt="Books Background" class="h-80 relative mt-10 flex-1" />
+        <img src="../assets/login_3.png" alt="Books Background" class="h-80 relative mt-10 flex-1" />
 
         <div class="flex-1 mt-25">
           <p class="text-5xl font-bold">Connect with friends.</p>
@@ -21,17 +25,9 @@
       <div class="absolute w-[300px] top-0 right-0 rounded-xl shadow-lg p-6 mt-6 bg-white">
         <h2 class="text-xl font-serif font-bold mb-4 text-center">Login</h2>
 
-        <form class="space-y-4">
-          <input type="text" placeholder="Username"
-            class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
-          <input type="password" placeholder="Password"
-            class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        <LoginForm />
 
-          <button
-            class="w-full py-2 rounded-lg bg-yellow-400 text-gray-900 font-semibold hover:bg-yellow-500 transition duration-200">
-            Login
-          </button>
-        </form>
+        <p v-if="errorMessages" class="text-red-500">{{ errorMessages }}</p>
 
         <p class="text-sm text-gray-600 mt-4 text-center">
           Don't have an account?
@@ -41,8 +37,8 @@
 
     </div>
     <footer class="mt-20 bg-gray-100 py-6 text-center text-sm text-gray-600">
-  © 2025 Social Book. All rights reserved.
-</footer>
+      © 2025 Social Book. All rights reserved.
+    </footer>
 
   </div>
 </template>
