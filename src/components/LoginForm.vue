@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from "vue"
 import axios from "axios"
+import { useRouter } from "vue-router"
 
 const username = ref("");
 const password = ref("");
 const errorMessage = ref("");
+const router = useRouter();
 
 async function login() {
     try {
@@ -23,8 +25,7 @@ async function login() {
         const { access_token } = response.data;
         localStorage.setItem("token", access_token);
 
-        alert("gut")
-
+        router.push('/home');
     }
     catch (error) {
         if (axios.isAxiosError(error) && error.response) {

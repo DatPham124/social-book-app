@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import './style.css'
 import App from './App.vue'
+import router from './router/index.js'
 
 /* add fontawesome core */
 import { library } from '@fortawesome/fontawesome-svg-core'
@@ -18,5 +19,6 @@ const app = createApp(App)
 
 app.component('font-awesome-icon', FontAwesomeIcon)
 
+app.use(router)
 
 app.mount('#app')

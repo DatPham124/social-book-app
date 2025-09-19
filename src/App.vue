@@ -1,8 +1,10 @@
 <script setup>
-import Login from './views/Login.vue'
 import Navbar from './components/Navbar.vue';
+import router from './router';
+import Home from './views/Home.vue';
+import Login from './views/Login.vue';
 </script>
 
 <template>
-  <Navbar />
+  <router-view />
 </template>
