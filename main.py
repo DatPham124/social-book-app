@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from .routes import users, admin, profiles, friend
 from common_lib.database import engine_user_srevice
 from sqlmodel import SQLModel, Session, select
@@ -21,6 +22,14 @@ def on_startup():
             ]
             session.add_all(roles)
             session.commit()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 app.include_router(users.router)
