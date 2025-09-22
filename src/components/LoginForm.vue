@@ -8,7 +8,10 @@ const password = ref("");
 const errorMessage = ref("");
 const router = useRouter();
 
+const loading = ref(false)
+
 async function login() {
+    loading.value = true
     try {
         const response = await axios.post("http://localhost:8000/users/token",
             new URLSearchParams({
@@ -28,6 +31,7 @@ async function login() {
         router.push('/home');
     }
     catch (error) {
+        loading.value = false
         if (axios.isAxiosError(error) && error.response) {
             if (error.response.status === 401 || error.response.status === 400) {
                 errorMessage.value = "Tên đăng nhập hoặc mật khẩu không hợp lệ."
@@ -50,10 +54,13 @@ async function login() {
         <input type="password" placeholder="Password" v-model="password"
             class="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
 
-        <button
-            class="w-full py-2 rounded-lg bg-yellow-400 text-gray-900 font-semibold hover:bg-yellow-500 transition duration-200">
-            Login
+
+        <button :disabled="loading"
+            class="w-full py-2 rounded-lg bg-yellow-400 text-gray-900 font-semibold hover:bg-yellow-500 transition">
+            <span v-if="loading">⏳ Đang xử lý...</span>
+            <span v-else>Login</span>
         </button>
+
         <p v-if="errorMessage" class="text-red-500 text-sm">{{ errorMessage }}</p>
     </form>
 

@@ -3,10 +3,10 @@ import LoginForm from '../components/LoginForm.vue';
 </script>
 
 <template>
-  <div class="relative bg-[#F3F4F6]">
+  <div class="relative">
     <div class="w-full h-65 bg-yellow-400 absolute z-0 mt-19"></div>
 
-    <div class="relative mx-auto min-h-screen w-5xl z-10">
+    <div class="relative mx-auto w-5xl z-10">
       <h1 class=" left-2 text-3xl font-logo z-10 p-5">📚 Social Book</h1>
 
       <img src="../assets/login_2.png" alt="Books Background" class="h-65 relative" />
@@ -29,14 +29,10 @@ import LoginForm from '../components/LoginForm.vue';
 
         <p class="text-sm text-gray-600 mt-4 text-center">
           Don't have an account?
-          <a href="#" class="text-blue-500 hover:underline">Register</a>
+          <a href="/register" class="text-blue-500 hover:underline">Register</a>
         </p>
       </div>
 
     </div>
-    <footer class="mt-20 bg-gray-100 py-6 text-center text-sm text-gray-600">
-      © 2025 Social Book. All rights reserved.
-    </footer>
-
   </div>
 </template>
