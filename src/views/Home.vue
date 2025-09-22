@@ -1,5 +1,6 @@
 <script setup>
 import Navbar from '../components/Navbar.vue';
+import HomeFeed from '../components/HomeFeed.vue';
 import { ref } from 'vue';
 
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
@@ -97,6 +98,6 @@ const isOpen = ref(false);
             </transition>
         </Menu>
 
-
+        <HomeFeed />
     </div>
 </template>
