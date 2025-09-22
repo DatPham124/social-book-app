@@ -6,23 +6,28 @@ from sqlmodel import SQLModel, Field
 
 
 class User(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)   # 👈 int autoincrement
-    email: str = Field(index=True, unique=True)
-    username: str = Field(index=True, unique=True)
+    id: int = Field(default=None, primary_key=True, index=True)  
+    email: str = Field(index=True, unique=True, nullable =False)
+    username: str = Field(index=True, unique=True, nullable =False)
     hashed_password: str
     disabled: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+class UserCreate(BaseModel):
+    email: str
+    username: str
+    password: str  
+
 
 class Profile(SQLModel, table=True):
-    user_id: int = Field(primary_key=True, foreign_key="user.id")  # quan hệ 1-1 với User
+    user_id: int = Field(primary_key=True, foreign_key="user.id")  
     full_name: Optional[str] = None
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
 
 
 class Role(SQLModel, table=True):
-    role_id: int = Field(default=None, primary_key=True)  # 👈 int autoincrement
+    role_id: int = Field(default=None, primary_key=True)  
     role_name: str
 
 

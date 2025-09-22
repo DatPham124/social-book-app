@@ -6,10 +6,11 @@ from fastapi.security import OAuth2PasswordRequestForm
 from jwt import PyJWTError
 from sqlmodel import Session
 from common_lib.database import get_session_user_service
-from ..model import Role, User, Password_Update, User_role
+from ..model import Role, User, Password_Update, User_role, UserCreate
 from .. import auth
 from dotenv import load_dotenv
 import os
+import re
 
 load_dotenv()
 
@@ -18,27 +19,53 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("/register", response_model=User)
-def register(user: User, session: Session = Depends(get_session_user_service)):
-    # hash mật khẩu trước khi lưu
-    plain_password = user.hashed_password
-    user.hashed_password = auth.get_password_hash(plain_password)
+def register(user: UserCreate, session: Session = Depends(get_session_user_service)):
 
-    session.add(user)
+    if not user.email or not user.username or not user.password:
+        raise HTTPException(status_code=400, detail="Không được để trống email, tên đăng nhập hoặc mật khẩu")
+    
+    email_regex = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    if not re.match(email_regex, user.email):
+        raise HTTPException(status_code=400, detail="Email không hợp lệ")
+
+    if len(user.password) < 6:
+        raise HTTPException(status_code=400, detail="Mật khẩu phải có ít nhất 6 ký tự")
+
+
+    user_email = session.query(User).filter(User.email == user.email).first()
+    if user_email:
+        raise HTTPException(status_code=400, detail="Email đã được đăng ký")
+    
+    user_name = session.query(User).filter(User.username == user.username).first()
+    if user_name:
+        raise HTTPException(status_code=400, detail="Tên người dùng đã được đăng ký")
+    
+    hashed_pw = auth.get_password_hash(user.password)
+
+    new_user = User(
+        email=user.email,
+        username=user.username,
+        hashed_password=hashed_pw
+    )
+
+
+
+    session.add(new_user)
     session.commit()
-    session.refresh(user)
+    session.refresh(new_user)
 
-    # tìm role mặc định "user"
+
     role_user = session.query(Role).filter(Role.role_name == "user").first()
+
     if not role_user:
         raise HTTPException(status_code=500, detail="Default role 'user' not found")
 
-    # gán role cho user vừa tạo
-    user_role = User_role(user_id=user.id, role_id=role_user.role_id)
+    user_role = User_role(user_id=new_user.id, role_id=role_user.role_id)
     session.add(user_role)
     session.commit()
     session.refresh(user_role)
 
-    return user
+    return new_user
 
 
 @router.post("/token")
