@@ -14,7 +14,7 @@ const isOpen = ref(false);
     <Navbar />
 
 
-    <div class="w-full max-w-5xl mx-auto m-5 space-y-6">
+    <div class="w-full max-w-4xl mx-auto m-5 space-y-6">
         <h1 class="text-2xl font-logo text-yellow-400 item-center">Khám phá</h1>
 
         <div class="bg-white border border-gray-200 rounded-lg shadow-sm ">
