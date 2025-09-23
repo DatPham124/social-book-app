@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from ..model import Books
+from ..model import Books, UserBookStatus
 from common_lib.database import get_session_book_service
 
 router = APIRouter(
@@ -65,3 +65,17 @@ def delete_book_by_id(book_id: int, session: Session = Depends(get_session_book_
     session.commit()
 
     return {f"Book with id {book_id} has been deleted"}
+
+@router.post('/status/add')
+def add_book_status(status: str, book_id: int, user_id:int,session: Session = Depends(get_session_book_service)):
+    new_status = UserBookStatus(
+        user_id=user_id,
+        book_id=book_id,
+        status=status
+    )
+    session.add(new_status)
+    session.commit()
+    session.refresh(new_status)
+    
+    return {"message": "Book status added successfully"}
+
