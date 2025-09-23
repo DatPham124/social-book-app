@@ -4,7 +4,7 @@ from ..model import Books
 from common_lib.database import get_session_book_service
 
 router = APIRouter(
-    prefix="/book",
+    prefix="/books",
     tags=["books"],
 )
 

@@ -12,7 +12,7 @@ class Books(SQLModel, table=True):
     language: Optional[str] = None
     authorID: Optional[int] = Field(foreign_key="authors.id")
     categoryID: Optional[int] = Field(foreign_key="category.id")
-    created_at: date = Field(default_factory=date)
+    created_at: date = Field(default_factory=date.today) 
 
 
 class Authors(SQLModel, table=True):
