@@ -61,7 +61,7 @@ const isOpen = ref(false);
 
         <Menu as="div" class="relative inline-block">
             <MenuButton
-                class="focus:outline-none focus:ring-2 focus:ring-yellow-400 inline-flex w-full justify-center gap-x-1.5 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-xs inset-ring-1 inset-ring-gray-300 hover:bg-gray-50">
+                class="focus:outline-none focus:ring-2 focus:ring-yellow-400 inline-flex w-full justify-center gap-x-1.5 rounded-md bg-white px-3 py-2 text-sm shadow-xs inset-ring-1 inset-ring-gray-300 hover:bg-gray-50">
                 Cập nhật
                 <ChevronDownIcon class="-mr-1 size-5 text-gray-400" aria-hidden="true" />
             </MenuButton>
