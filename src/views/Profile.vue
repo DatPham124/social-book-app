@@ -1,7 +1,7 @@
 <script setup>
 import Navbar from "../components/Navbar.vue"
 import CurentlyReadingBooks from "../components/CurentlyReadingBooks.vue"
-import ReadingRecently from "../components/ReadingRecently.vue";
+import Read from "../components/Read.vue";
 import ToReadPile from "../components/ToReadPile.vue";
 import ProfileHeader from "../components/ProfileHeader.vue";
 </script>
@@ -11,23 +11,16 @@ import ProfileHeader from "../components/ProfileHeader.vue";
     <Navbar />
 
     <div class="w-full max-w-6xl mx-auto p-6 space-y-8">
-        <!-- Header -->
         <ProfileHeader />
 
-        <!-- Grid layout -->
         <div class="grid grid-cols-[2fr_1fr] gap-6">
-            <!-- Left Column -->
             <div class="space-y-6">
-                <!-- Currently Reading -->
                 <CurentlyReadingBooks />
 
-                <!-- Read Recently -->
-                <ReadingRecently />
+                <Read />
             </div>
 
-            <!-- Right Column -->
             <div class="space-y-6">
-                <!-- Reading Preferences -->
                 <div class="bg-white p-6 rounded-lg shadow border">
                     <p class="text-gray-700 mb-2">
                         Mainly reads <span class="text-teal-700 font-medium">nonfiction</span> books that are
@@ -44,7 +37,6 @@ import ProfileHeader from "../components/ProfileHeader.vue";
                     </div>
                 </div>
 
-                <!-- To-Read Pile -->
                 <ToReadPile />
 
 

@@ -26,13 +26,10 @@ if (token) {
     }
 }
 
-// 2. Thêm hàm đăng xuất
 const signOut = () => {
     localStorage.removeItem('token');
-    // Chuyển hướng về trang đăng nhập hoặc trang chủ
     window.location.href = '/login';
 }
-
 </script>
 
 <template>
@@ -42,9 +39,9 @@ const signOut = () => {
                 <div class="flex space-x-8 item-center">
                     <h1 class="text-2xl font-logo text-yellow-500 item-center">📚 Social Book</h1>
                     <div class="hidden md:flex space-x-6 items-center">
-                        <a href="/" class="text-gray-700 hover:text-yellow-500">Trang chủ</a>
-                        <a href="/books" class="text-gray-700 hover:text-yellow-500">Sách</a>
-                        <a href="/friends" class="text-gray-700 hover:text-yellow-500">Bạn bè</a>
+                        <router-link to="/" class="text-gray-700 hover:text-yellow-500">Trang chủ</router-link>
+                        <router-link to="/books" class="text-gray-700 hover:text-yellow-500">Sách</router-link>
+                        <router-link to="/friends" class="text-gray-700 hover:text-yellow-500">Bạn bè</router-link>
                     </div>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -71,22 +68,31 @@ const signOut = () => {
                             leave-from-class="transform opacity-100 scale-100"
                             leave-to-class="transform opacity-0 scale-95"
                         >
-                            <MenuItems class="hover- absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                            <MenuItems class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                                 <div class="px-4 py-2 text-sm text-gray-700 border-b">
                                     <strong class="font-medium">{{ userInfo.username }}</strong>
                                 </div>
                                 <MenuItem v-slot="{ active }">
-                                    <a href="/profile" :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
+                                    <router-link
+                                      to="/profile"
+                                      :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']"
+                                    >
                                         Hồ sơ của bạn
-                                    </a>
+                                    </router-link>
                                 </MenuItem>
                                 <MenuItem v-slot="{ active }">
-                                    <a href="/settings" :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
+                                    <router-link
+                                      to="/settings"
+                                      :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']"
+                                    >
                                         Cài đặt
-                                    </a>
+                                    </router-link>
                                 </MenuItem>
                                 <MenuItem v-slot="{ active }">
-                                    <button @click="signOut" :class="[active ? 'bg-yellow-100' : '', 'block w-full text-left px-4 py-2 text-sm text-gray-700']">
+                                    <button
+                                      @click="signOut"
+                                      :class="[active ? 'bg-yellow-100' : '', 'block w-full text-left px-4 py-2 text-sm text-gray-700']"
+                                    >
                                         Đăng xuất
                                     </button>
                                 </MenuItem>
@@ -95,7 +101,7 @@ const signOut = () => {
                     </Menu>
                 </div>
                 <div v-else>
-                    <a href="/login" class="text-gray-700 hover:text-yellow-500">Đăng nhập</a>
+                    <router-link to="/login" class="text-gray-700 hover:text-yellow-500">Đăng nhập</router-link>
                 </div>
             </div>
         </div>
