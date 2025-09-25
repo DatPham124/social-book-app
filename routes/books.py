@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, and_, or_, select
 from ..model import Books, UserBookStatus
 from common_lib.database import get_session_book_service
@@ -91,23 +91,6 @@ def add_book_status(status_change: str, book_id: int, user_id: int, session: Ses
     session.refresh(new_status)
     return {"message": "Book status added successfully"}
 
-
-@router.put('/status/update/{status_id}')
-def update_book_status(status_id: int, new_status: str, session: Session = Depends(get_session_book_service)):
-    valid_status = ["to_read", "currently_reading", "read", "DNF"]
-    if new_status not in valid_status:
-        raise HTTPException(status_code=400, detail="Trạng thái không hợp lệ")
-
-    book_status = session.get(UserBookStatus, status_id)
-    if book_status is None:
-        raise HTTPException(status_code=404, detail="Không tìm thấy trạng thái sách")
-    
-    book_status.status = new_status
-    session.add(book_status)
-    session.commit()
-    session.refresh(book_status)
-    return {"message": "Book status updated successfully"}
-
 @router.get('/status/book/{user_id}', response_model=list[UserBookStatus])
 def get_book_by_status_and_userID(
     status: str,
@@ -135,4 +118,76 @@ def get_book_by_status_and_userID(
             detail=f"Không tìm thấy sách với trạng thái '{status}' cho user_id={user_id}"
         )
 
+    return results
+
+
+@router.put('/{book_id}/status')
+def update_user_book_status(
+    book_id: int,
+    user_id: int,
+    status: str,
+    session: Session = Depends(get_session_book_service)
+):
+    valid_status = ["to_read", "currently_reading", "read", "dnf"]
+    if status not in valid_status:
+        raise HTTPException(status_code=400, detail="Trạng thái không hợp lệ")
+
+    # Kiểm tra xem bản ghi có tồn tại chưa
+    statement = select(UserBookStatus).where(
+        and_(
+            UserBookStatus.book_id == book_id,
+            UserBookStatus.user_id == user_id
+        )
+    )
+    book_status = session.exec(statement).first()
+
+    if not book_status:
+        book_status = UserBookStatus(
+            user_id=user_id,
+            book_id=book_id,
+            status=status
+        )
+        session.add(book_status)
+    else:
+        book_status.status = status
+        session.add(book_status)
+
+    session.commit()
+    session.refresh(book_status)
+
+    return {"message": "✅ Book status updated", "status": book_status.status}
+
+@router.get("/explore/{user_id}")
+def get_explore_books(
+    user_id: int,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(10, le=50),  # mỗi lần load tối đa 50 sách
+    session: Session = Depends(get_session_book_service)
+):
+
+    subquery = select(UserBookStatus.book_id).where(UserBookStatus.user_id == user_id)
+
+    statement = (
+        select(Books)
+        .where(Books.id.not_in(subquery))  # chưa có trạng thái
+        .offset(offset)
+        .limit(limit)
+    )
+
+    books = session.exec(statement).all()
+
+    results = [
+        {
+            "id": book.id,
+            "title": book.title,
+            "description": book.description,
+            "cover_url": book.cover_url,
+            "published_date": book.published_date,
+            "language": book.language,
+            "authorID": book.authorID,
+            "categoryID": book.categoryID,
+            "status": "to_read"
+        }
+        for book in books
+    ]
     return results
