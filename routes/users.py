@@ -85,7 +85,7 @@ async def login_for_access_token(
         roles_name = auth.get_role(user.id, session)
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = auth.create_access_token(
-            data={"sub": user.username, "roles": roles_name},
+            data={"username": user.username, "roles": roles_name, "user_id": user.id},
             expires_delta=access_token_expires
         )
     except PyJWTError as e: 
@@ -102,13 +102,13 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.get("/users/me/", response_model=User)
+@router.get("/me/", response_model=User)
 async def read_users_me(
     current_user: Annotated[User, Depends(auth.get_current_active_user)],
 ):
     return current_user
 
-@router.put("/users/me/password")
+@router.put("/me/password")
 def update_password(
     password_data: Password_Update,
     session: Session = Depends(get_session_user_service),
