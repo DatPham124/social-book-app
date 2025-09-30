@@ -1,9 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlmodel import Session
 from common_lib.database import get_session_user_service
 from ..model import Profile, User
 from .. import auth
+from dotenv import load_dotenv
+import os
+import requests  
 
+load_dotenv()
+
+FILE_SERVER_API = os.getenv("FILE_SERVER_API")
 router = APIRouter(
     prefix="/users",
     tags=["profiles"],
@@ -17,18 +23,13 @@ def create_profile(
     current_user: User = Depends(auth.get_current_active_user)
 ):
     existing_profile = session.get(Profile, current_user.id)
-
     if existing_profile:
-        raise HTTPException(
-            status_code=400, detail="Profile already exists for this user"
-        )
+        raise HTTPException(status_code=400, detail="Profile already exists for this user")
 
     profile.user_id = current_user.id
-
     session.add(profile)
     session.commit()
     session.refresh(profile)
-
     return profile
 
 
@@ -39,11 +40,8 @@ def update_profile(
     current_user: User = Depends(auth.get_current_active_user)
 ):
     profile = session.get(Profile, current_user.id)
-
     if profile is None:
-        raise HTTPException(
-            status_code=400, detail="Can't get profile"
-        )
+        raise HTTPException(status_code=400, detail="Can't get profile")
     
     if profile_data.full_name is not None:
         profile.full_name = profile_data.full_name
@@ -55,7 +53,6 @@ def update_profile(
     session.add(profile)
     session.commit()
     session.refresh(profile)
-
     return profile
 
 
@@ -65,12 +62,8 @@ def get_profile(
     current_user: User = Depends(auth.get_current_active_user)
 ):
     profile = session.get(Profile, current_user.id)
-
     if profile is None:
-        raise HTTPException(
-            status_code=400, detail="Profile is not found"
-        )
-    
+        raise HTTPException(status_code=400, detail="Profile is not found")
     return profile
 
 
@@ -83,3 +76,34 @@ def get_profile_by_id(
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile
+
+
+@router.put("/me/avatar")
+def update_avatar(
+    session: Session = Depends(get_session_user_service),
+    current_user: User = Depends(auth.get_current_active_user),
+    file: UploadFile = File(...)
+):
+    try:
+        response = requests.post(
+    f"{FILE_SERVER_API}/upload/avatar",
+    files={"file": (file.filename, file.file, file.content_type)}
+)
+
+        response.raise_for_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi upload ảnh: {e}")
+
+    result = response.json()
+    filename = result.get("filename") 
+
+    profile = session.get(Profile, current_user.id)
+    if not profile:
+        profile = Profile(user_id=current_user.id)
+
+    profile.avatar_url = filename 
+    session.add(profile)
+    session.commit()
+    session.refresh(profile)
+
+    return {"avatar_url": filename}
