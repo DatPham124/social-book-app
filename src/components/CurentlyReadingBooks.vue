@@ -2,14 +2,12 @@
 import axios from "axios";
 import { ref, onMounted } from "vue";
 import { jwtDecode } from "jwt-decode";
-import { BOOK_SERVICE_URL, IMAGE_SERVER_URL } from "../config.ts";
+import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from "../config.ts";
 
-// State
 const books = ref<any[]>([]); // mảng sách chi tiết
 const loading = ref(true);
 const errorMessage = ref<string | null>(null);
 
-// Interface token
 interface TokenPayLoad {
   username: string;
   roles: number[];
@@ -17,7 +15,6 @@ interface TokenPayLoad {
   user_id: number;
 }
 
-// Lấy userInfo từ token
 const token = localStorage.getItem("token");
 let userInfo: TokenPayLoad | null = null;
 
@@ -34,7 +31,6 @@ if (token) {
   }
 }
 
-// API: lấy chi tiết 1 cuốn sách
 async function get_book_by_id(book_id: number) {
   try {
     const response = await axios.get(`${BOOK_SERVICE_URL}books/${book_id}`);
@@ -49,7 +45,6 @@ async function get_book_by_id(book_id: number) {
   }
 }
 
-// API: lấy danh sách currently reading và map sang chi tiết sách
 async function getCurrentlyReadingBooks() {
   if (!userInfo) {
     errorMessage.value = "Bạn chưa đăng nhập!";
@@ -93,7 +88,6 @@ async function getCurrentlyReadingBooks() {
 
 }
 
-// Khi component mount
 onMounted(async () => {
   await getCurrentlyReadingBooks();
 });
@@ -101,34 +95,50 @@ onMounted(async () => {
 
 <template>
   <div class="bg-white p-6 rounded-lg shadow border">
-    <h3 class="text-lg font-semibold mb-4">Đang đọc ({{ books.length }})</h3>
+    <h3 class="text-lg font-semibold mb-4">
+      Đang đọc ({{ books.length }})
+    </h3>
 
     <div v-if="loading">Đang tải...</div>
     <div v-else-if="errorMessage" class="text-gray-500 italic">
       {{ errorMessage }}
     </div>
-
     <div v-else>
-      <h3 class="text-lg font-semibold mb-4">
-        Currently reading ({{ books.length }})
-      </h3>
-
-      <div class="flex items-start space-x-4">
-        <div v-for="item in books" :key="item.book.id"
-          class="w-24 h-36 shadow-md flex items-center justify-center rounded overflow-hidden">
-          <img :src="`${IMAGE_SERVER_URL}/${item.book.cover_url}`" :alt="item.book.title"
-            class="h-full w-full object-contain" />
+      <div class="flex space-x-4">
+        <div
+          v-for="item in books"
+          :key="item.book.id"
+          class="w-20 h-28 shadow rounded overflow-hidden bg-gray-100 flex items-center justify-center"
+        >
+          <!-- Nếu có ảnh bìa -->
+          <img
+            v-if="item.book.cover_url"
+            :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`"
+            :alt="item.book.title"
+            class="h-full w-full object-cover"
+          />
+          <!-- Nếu không có ảnh bìa thì hiện tên -->
+          <span v-else class="text-xs text-gray-500 p-1 text-center">
+            {{ item.book.title }}
+          </span>
         </div>
       </div>
 
       <div class="mt-4 flex space-x-3">
-        <button class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
-          View all
-        </button>
-        <button class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
-          Reading Journal
-        </button>
+        <router-link
+          to="/profile/view/curently"
+          class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm"
+        >
+          Xem tất cả
+        </router-link>
+        <router-link
+          to="/"
+          class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm"
+        >
+          Xem nhật ký
+        </router-link>
       </div>
     </div>
   </div>
 </template>
+

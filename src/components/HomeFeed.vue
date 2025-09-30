@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue';
 import axios from 'axios';
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/vue'
 import { ChevronUpDownIcon } from '@heroicons/vue/20/solid'
-import { BOOK_SERVICE_URL, IMAGE_SERVER_URL } from '../config.ts'
+import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from '../config.ts'
 import { jwtDecode } from 'jwt-decode';
 
 const offset = ref(0);
@@ -100,9 +100,6 @@ async function updateBookStatus(bookId: number, newStatus: any) {
     });
 
     console.log(`✅ Book ${bookId} updated to status: ${newStatus.value}`);
-
-    // Xóa sách khỏi list Explore (vì không còn "to_read")
-    books.value = books.value.filter(b => b.id !== bookId);
   } catch (error) {
     console.error("❌ Lỗi khi cập nhật trạng thái:", error);
   }
@@ -179,7 +176,7 @@ onMounted(() => {
         <div class="flex flex-row relative h-60 w-full bg-white rounded-lg shadow-md m-2">
           <!-- Ảnh bìa -->
           <div class="relative h-full w-40 flex-shrink-0">
-            <img :src="`${IMAGE_SERVER_URL}/${book.cover_url}`" alt="Book Cover" class="h-full object-contain" />
+            <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" alt="Book Cover" class="h-full object-contain" />
           </div>
 
           <!-- Thông tin sách -->

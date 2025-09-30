@@ -7,7 +7,6 @@ import Footer from './components/Footer.vue';
     <main class="flex-grow">
       <router-view />
     </main>
-    <Footer />
   </div>
 
 </template>

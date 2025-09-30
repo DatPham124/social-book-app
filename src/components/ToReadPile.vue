@@ -2,7 +2,7 @@
 import axios from "axios";
 import { ref, onMounted } from "vue";
 import { jwtDecode } from "jwt-decode";
-import { BOOK_SERVICE_URL, IMAGE_SERVER_URL } from "../config.ts"; // import config
+import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from "../config.ts"; // import config
 
 const books = ref<any[]>([]);
 const loading = ref(true);
@@ -101,7 +101,7 @@ onMounted(() => {
       <div class="flex space-x-4">
         <div v-for="item in books" :key="item.book.id"
           class="w-20 h-28 shadow rounded overflow-hidden bg-gray-100 flex items-center justify-center">
-          <img v-if="item.book.cover_url" :src="`${IMAGE_SERVER_URL}/${item.book.cover_url}`" :alt="item.book.title"
+          <img v-if="item.book.cover_url" :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`" :alt="item.book.title"
             class="h-full w-full object-cover" />
           <span v-else class="text-xs text-gray-500 p-1 text-center">
             {{ item.book.title }}

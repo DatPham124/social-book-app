@@ -39,7 +39,7 @@ const signOut = () => {
                 <div class="flex space-x-8 item-center">
                     <h1 class="text-2xl font-logo text-yellow-500 item-center">📚 Social Book</h1>
                     <div class="hidden md:flex space-x-6 items-center">
-                        <router-link to="/" class="text-gray-700 hover:text-yellow-500">Trang chủ</router-link>
+                        <router-link to="/home" class="text-gray-700 hover:text-yellow-500">Trang chủ</router-link>
                         <router-link to="/books" class="text-gray-700 hover:text-yellow-500">Sách</router-link>
                         <router-link to="/friends" class="text-gray-700 hover:text-yellow-500">Bạn bè</router-link>
                     </div>

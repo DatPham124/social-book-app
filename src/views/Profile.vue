@@ -14,6 +14,8 @@ import ProfileHeader from "../components/ProfileHeader.vue";
         <ProfileHeader />
 
         <div class="grid grid-cols-[2fr_1fr] gap-6">
+
+            
             <div class="space-y-6">
                 <CurentlyReadingBooks />
 
