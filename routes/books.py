@@ -1,16 +1,13 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, and_, or_, select
-from ..model import Books, UserBookStatus
+from ..model import Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink
 from common_lib.database import get_session_book_service
 
 router = APIRouter(
     prefix="/books",
     tags=["books"],
 )
-
-# -----------------------
-# BOOK CRUD
-# -----------------------
 
 @router.post('/add', response_model=Books)
 def add_book(book: Books, session: Session = Depends(get_session_book_service)):
@@ -32,8 +29,16 @@ def get_book_by_id(book_id: int, session: Session = Depends(get_session_book_ser
     book = session.get(Books, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
-    return book
+    
+    # lấy categories
+    stmt = (
+        select(Category)
+        .join(BookCategoryLink, BookCategoryLink.category_id == Category.id)
+        .where(BookCategoryLink.book_id == book.id)
+    )
+    categories = session.exec(stmt).all()
 
+    return book
 
 @router.put('/update/{book_id}', response_model=Books)
 def update_book(book_id: int, book_data: Books, session: Session = Depends(get_session_book_service)):
@@ -41,7 +46,7 @@ def update_book(book_id: int, book_data: Books, session: Session = Depends(get_s
     if book is None:
         raise HTTPException(status_code=404, detail='No book found')
     
-    update_fields = ["title", "description", "cover_url", "published_date", "language", "authorID"]
+    update_fields = ["title", "description", "cover_url", "published_date", "language", "authorID", "page_count"]
     for field in update_fields:
         value = getattr(book_data, field)
         if value is not None:
@@ -77,7 +82,7 @@ def get_all_status_books(session: Session = Depends(get_session_book_service)):
 
 @router.post('/status/add')
 def add_book_status(status_change: str, book_id: int, user_id: int, session: Session = Depends(get_session_book_service)):
-    valid_status = ["to_read", "currently_reading", "read", "DNF"]
+    valid_status = ["to_read", "currently_reading", "read", "dnf"]
     if status_change not in valid_status:
         raise HTTPException(status_code=400, detail="Trạng thái không hợp lệ")
 
@@ -161,23 +166,26 @@ def update_user_book_status(
 def get_explore_books(
     user_id: int,
     offset: int = Query(0, ge=0),
-    limit: int = Query(10, le=50),  # mỗi lần load tối đa 50 sách
+    limit: int = Query(10, le=50),
     session: Session = Depends(get_session_book_service)
 ):
-
     subquery = select(UserBookStatus.book_id).where(UserBookStatus.user_id == user_id)
 
     statement = (
         select(Books)
-        .where(Books.id.not_in(subquery))  # chưa có trạng thái
+        .where(Books.id.not_in(subquery))
         .offset(offset)
         .limit(limit)
     )
 
     books = session.exec(statement).all()
 
-    results = [
-        {
+    results = []
+    for book in books:
+        # Lấy category names
+        category_names = [cat.name for cat in book.categories] if book.categories else []
+        
+        results.append({
             "id": book.id,
             "title": book.title,
             "description": book.description,
@@ -185,9 +193,86 @@ def get_explore_books(
             "published_date": book.published_date,
             "language": book.language,
             "authorID": book.authorID,
-            "categoryID": book.categoryID,
+            "categories": category_names,  # Trả về mảng categories
             "status": "to_read"
-        }
-        for book in books
-    ]
+        })
+    
     return results
+
+
+@router.get("/{book_id}/categories", response_model=List[Category])
+def get_book_categories(book_id: int, session: Session = Depends(get_session_book_service)):
+    book = session.get(Books, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    return book.categories
+
+# Thêm vào routes books.py
+
+@router.get("/reading-progress/{user_id}/{book_id}")
+def get_reading_progress(
+    user_id: int,
+    book_id: int,
+    session: Session = Depends(get_session_book_service)
+):
+    statement = select(ReadingProgress).where(
+        and_(
+            ReadingProgress.user_id == user_id,
+            ReadingProgress.book_id == book_id
+        )
+    )
+    progress = session.exec(statement).first()
+    
+    if not progress:
+        # Nếu chưa có tiến độ, trả về mặc định
+        book = session.get(Books, book_id)
+        return {
+            "user_id": user_id,
+            "book_id": book_id,
+            "current_page": 0,
+            "total_pages": book.page_count if book else 0
+        }
+    
+    return progress
+
+@router.put("/reading-progress/{user_id}/{book_id}")
+def update_reading_progress(
+    user_id: int,
+    book_id: int,
+    current_page_from_user: int,
+    session: Session = Depends(get_session_book_service)
+):
+    
+       # Lấy sách từ DB
+    book = session.get(Books, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    # Kiểm tra số trang
+    if current_page_from_user > book.page_count:
+        raise HTTPException(status_code=400, detail="Số trang vượt quá số trang thực tế")
+
+    statement = select(ReadingProgress).where(
+        and_(
+            ReadingProgress.user_id == user_id,
+            ReadingProgress.book_id == book_id
+        )
+    )
+    progress = session.exec(statement).first()
+
+    if not progress:
+        progress = ReadingProgress(
+            user_id=user_id,
+            book_id=book_id,
+            current_page=current_page_from_user    
+        )
+    else:
+        progress.current_page = current_page_from_user
+        
+    session.add(progress)
+    session.commit()
+    session.refresh(progress)
+    
+    return progress
+

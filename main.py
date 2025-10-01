@@ -9,7 +9,6 @@ app = FastAPI()
 @app.on_event("startup")
 def on_startup():
 
-
     SQLModel.metadata.create_all(engine_book_service)
 
 
