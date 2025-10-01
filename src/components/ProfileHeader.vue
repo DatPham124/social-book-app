@@ -25,7 +25,7 @@ if (token) {
     }
 }
 
-const favoriteBooks = ref([""]);
+const favoriteBooks = ref([]);
 
 
 </script>

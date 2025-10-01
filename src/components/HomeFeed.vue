@@ -11,50 +11,6 @@ const limit = 10;
 const loadingMore = ref(false);
 const hasMore = ref(true);
 
-async function loadMoreBooks() {
-  if (!userInfo || loadingMore.value || !hasMore.value) return;
-  loadingMore.value = true;
-  try {
-    const response = await axios.get(
-      `${BOOK_SERVICE_URL}books/explore/${userInfo.user_id}`,
-      { params: { offset: offset.value, limit } }
-    );
-
-    if (response.data.length < limit) {
-      hasMore.value = false; // hết sách để load
-    }
-
-    const newBooks = await Promise.all(
-      response.data.map(async (book: any) => {
-        const [authorResponse, categoryResponse] = await Promise.all([
-          getAuthor(book.authorID),
-          getCategory(book.categoryID)
-        ]);
-
-        const authorName = authorResponse ? authorResponse.name : "Không rõ";
-        const categoryName = categoryResponse ? categoryResponse.name : "Không rõ";
-
-        return {
-          ...book,
-          authorName,
-          categoryName,
-          status: { value: "to_read", label: "Sẽ đọc" }
-        };
-      })
-    );
-
-    books.value.push(...newBooks);
-    offset.value += limit;
-  } catch (error: any) {
-    console.error("Lỗi load sách:", error);
-  } finally {
-    loadingMore.value = false;
-  }
-}
-
-
-
-
 interface TokenPayLoad {
   username: string
   roles: number[]
@@ -105,8 +61,6 @@ async function updateBookStatus(bookId: number, newStatus: any) {
   }
 }
 
-
-
 async function getAuthor(authorID: number) {
   try {
     const response = await axios.get(`${BOOK_SERVICE_URL}author/${authorID}`);
@@ -115,53 +69,67 @@ async function getAuthor(authorID: number) {
     errorMessages.value = axios.isAxiosError(error) && error.response
       ? error.response.data.detail
       : "Không thể kết nối đến server";
+    return null;
   }
 }
 
-async function getCategory(categoryID: number) {
+// Hàm mới để lấy categories của sách
+async function getBookCategories(bookId: number) {
   try {
-    const response = await axios.get(`${BOOK_SERVICE_URL}category/${categoryID}`);
+    const response = await axios.get(`${BOOK_SERVICE_URL}books/${bookId}/categories`);
     return response.data;
   } catch (error: any) {
-    errorMessages.value = axios.isAxiosError(error) && error.response
-      ? error.response.data.detail
-      : "Không thể kết nối đến server";
+    console.error("Lỗi khi lấy categories:", error);
+    return [];
   }
 }
 
-async function getBooks() {
+async function loadMoreBooks() {
+  if (!userInfo || loadingMore.value || !hasMore.value) return;
+  loadingMore.value = true;
   try {
-    const response = await axios.get(`${BOOK_SERVICE_URL}books/`);
+    const response = await axios.get(
+      `${BOOK_SERVICE_URL}books/explore/${userInfo.user_id}`,
+      { params: { offset: offset.value, limit } }
+    );
 
-    const updatedBooks = await Promise.all(
+    if (response.data.length < limit) {
+      hasMore.value = false;
+    }
+
+    const newBooks = await Promise.all(
       response.data.map(async (book: any) => {
-        const [authorResponse, categoryResponse] = await Promise.all([
+        const [authorResponse, categoriesResponse] = await Promise.all([
           getAuthor(book.authorID),
-          getCategory(book.categoryID)
+          getBookCategories(book.id) // Sửa thành book.id
         ]);
 
-        const authorName = authorResponse ? authorResponse.name : 'Không rõ';
-        const categoryName = categoryResponse ? categoryResponse.name : 'Không rõ';
+        const authorName = authorResponse ? authorResponse.name : "Không rõ";
+        // Xử lý nhiều categories
+        const categoryNames = categoriesResponse && categoriesResponse.length > 0 
+          ? categoriesResponse.map((cat: any) => cat.name).join(', ')
+          : "Không rõ";
 
-        const bookStatus = mapStatus(book.status || 'to_read');
-
-        return { ...book, authorName, categoryName, status: bookStatus };
+        return {
+          ...book,
+          authorName,
+          categoryName: categoryNames, // Giữ tên cũ để tương thích
+          status: { value: "to_read", label: "Sẽ đọc" }
+        };
       })
     );
 
-    books.value = updatedBooks;
+    books.value.push(...newBooks);
+    offset.value += limit;
   } catch (error: any) {
-    errorMessages.value = axios.isAxiosError(error) && error.response
-      ? error.response.data.detail
-      : "Không thể kết nối đến server";
+    console.error("Lỗi load sách:", error);
+  } finally {
+    loadingMore.value = false;
   }
 }
 
-
-
 onMounted(() => {
   loadMoreBooks();
-
 });
 </script>
 
@@ -204,35 +172,33 @@ onMounted(() => {
                   class="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm">
                   <ListboxOption v-for="status in statuses" :key="status.value" :value="status"
                     v-slot="{ active, selected }">
-      <li :class="[
-        active ? 'bg-yellow-100 text-yellow-900' : 'text-gray-900',
-        'relative cursor-default select-none py-2 pl-10 pr-4'
-      ]">
-        <span :class="[selected ? 'font-medium' : 'font-normal', 'block truncate']">
-          {{ status.label }}
-        </span>
-        <span v-if="selected" class="absolute inset-y-0 left-0 flex items-center pl-3 text-yellow-600">
-          ✔
-        </span>
+                    <li :class="[
+                      active ? 'bg-yellow-100 text-yellow-900' : 'text-gray-900',
+                      'relative cursor-default select-none py-2 pl-10 pr-4'
+                    ]">
+                      <span :class="[selected ? 'font-medium' : 'font-normal', 'block truncate']">
+                        {{ status.label }}
+                      </span>
+                      <span v-if="selected" class="absolute inset-y-0 left-0 flex items-center pl-3 text-yellow-600">
+                        ✔
+                      </span>
+                    </li>
+                  </ListboxOption>
+                </ListboxOptions>
+              </div>
+            </Listbox>
+          </div>
+        </div>
       </li>
-      </ListboxOption>
-      </ListboxOptions>
-  </div>
-  </Listbox>
-  </div>
-  </div>
-  </li>
-  </ul>
+    </ul>
 
-
-  <div class="text-center mt-4">
-    <button v-if="hasMore && !loadingMore" @click="loadMoreBooks"
-      class="px-4 py-2 bg-yellow-400 rounded-md hover:bg-yellow-500">
-      Tải thêm
-    </button>
-    <p v-else-if="!hasMore" class="text-gray-500">Đã tải hết sách</p>
-    <p v-else class="text-gray-500">Đang tải...</p>
-  </div>
-
+    <div class="text-center mt-4">
+      <button v-if="hasMore && !loadingMore" @click="loadMoreBooks"
+        class="px-4 py-2 bg-yellow-400 rounded-md hover:bg-yellow-500">
+        Tải thêm
+      </button>
+      <p v-else-if="!hasMore" class="text-gray-500">Đã tải hết sách</p>
+      <p v-else class="text-gray-500">Đang tải...</p>
+    </div>
   </div>
 </template>
