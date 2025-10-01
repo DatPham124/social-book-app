@@ -21,7 +21,6 @@ let userInfo: any = null
 const currentlyReadingBooks = ref<any[]>([])
 const loading = ref(true)
 const errorMessages = ref("")
-const progressResponse = ref("")
 const isSaving = ref(false)
 
 // Decode token
@@ -75,10 +74,33 @@ async function updateReadingProgress(book: any, newPage: number) {
       alert("Lỗi không xác định");
     }
   } finally {
-    isSaving.value = false
+    book.isSaving = false;
   }
 }
 
+async function getCategoryLink(bookId: number) {
+  try {
+    const category_list = await axios.get(`${BOOK_SERVICE_URL}category/book-category-link/book/${bookId}`);
+    console.log(category_list.data)
+    return category_list.data;
+  }
+  catch (error) {
+    console.error("Lỗi khi lấy liên kết thể loại: ", error);
+    return null;
+  }
+}
+
+async function getCategory(category_id: number) {
+  try {
+    const respone = await axios.get(`${BOOK_SERVICE_URL}category/${category_id}`);
+    console.log(respone.data)
+    return respone.data
+  }
+  catch (error) {
+    console.error("Lỗi khi lấy thể loại: ", error);
+    return null;
+  }
+}
 
 
 // Map trạng thái string -> object
@@ -118,10 +140,23 @@ async function fetchCurrentlyReadingBooks() {
         const bookResponse = await axios.get(`${BOOK_SERVICE_URL}books/${userBook.book_id}`);
         const book = bookResponse.data;
 
-        const authorName = "Không rõ";
-        const categoryName = "Không rõ";
+        const authorName = "Không xác định";
 
         const progressData = await getReadingProgress(userInfo.user_id, userBook.book_id);
+
+        let categoryName = "Không xác định"
+
+        const categoryLink = await getCategoryLink(userBook.book_id);
+
+        if (Array.isArray(categoryLink) && categoryLink.length > 0) {
+          const categories = await Promise.all(
+            categoryLink.map((cl: any) => getCategory(cl.category_id))
+          );
+          categoryName = categories
+            .filter(c => c) // bỏ null
+            .map(c => c.name)
+            .join(', ');
+        }
 
         const current_page = progressData?.current_page || 0;
         const total_pages = progressData?.total_pages || book.page_count || 0;
@@ -130,6 +165,7 @@ async function fetchCurrentlyReadingBooks() {
           : 0;
         return {
           ...book,
+          isSaving: false,
           authorName,
           categoryName,
           start_date: userBook.start_date,
@@ -138,7 +174,7 @@ async function fetchCurrentlyReadingBooks() {
           progress_percentage,
           status: mapStatus(userBook.status),
           editingProgress: false,
-          newPage: current_page
+          newPage: current_page,
         };
       })
     );
@@ -207,7 +243,7 @@ onMounted(() => {
 
         <div class="flex flex-grow p-4">
 
-          <div class="flex-grow pr-6 border-r border-gray-100">
+          <div class="flex-grow pr-6 border-r border-gray-100 min-w-0">
             <h3 class="font-bold text-lg mb-0.5 text-gray-800">{{ book.title }}</h3>
             <p class="text-gray-600 text-sm mb-1">{{ book.authorName }}</p>
 
@@ -228,8 +264,7 @@ onMounted(() => {
 
           </div>
 
-          <div class="w-56 pl-6 flex flex-col justify-between items-start">
-
+          <div class="w-56 pl-6 flex flex-col justify-between items-start flex-shrink-0">
             <div class="w-full mb-3 relative">
 
 

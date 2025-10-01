@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { jwtDecode } from "jwt-decode"
+import axios from "axios";
+import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from "../config";
+
 
 interface TokenPayLoad {
     username: string;
@@ -24,8 +27,78 @@ if (token) {
         localStorage.removeItem("token");
     }
 }
+const favoriteBooks = ref<any[]>([]);
+async function getFavorite(user_id: number) {
+    try {
+        const response = await axios.get(`${BOOK_SERVICE_URL}books/favorite/${user_id}`);
+        return response.data;
 
-const favoriteBooks = ref([]);
+    }
+    catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            if (error.response) {
+                console.error("Server trả lỗi:", error.response.data);
+            } else if (error.request) {
+                console.error("Không kết nối được đến server");
+            }
+        } else {
+            console.error("Lỗi không xác định:", error);
+        }
+        return null;
+    }
+}
+
+async function getBookByID(book_id: number) {
+    try {
+        const respone = await axios.get(`${BOOK_SERVICE_URL}books/${book_id}`)
+        return respone.data
+    }
+    catch (error: any) {
+        if (axios.isAxiosError(error)) {
+            if (error.response) {
+                console.error("Server trả lỗi:", error.response.data);
+            } else if (error.request) {
+                console.error("Không kết nối được đến server");
+            }
+        } else {
+            console.error("Lỗi không xác định:", error);
+        }
+        return null;
+    }
+}
+
+async function fetchFavoriteBook(userId: number) {
+  try {
+    // Lấy danh sách book_id từ bảng favorite
+    const favoriteList = await getFavorite(userId);
+
+    if (!favoriteList || favoriteList.length === 0) {
+      favoriteBooks.value = [];
+      return;
+    }
+
+    // Gọi API lấy chi tiết sách cho tất cả book_id song song
+    const books = await Promise.all(
+      favoriteList.map((fav: any) => getBookByID(fav.book_id))
+    );
+
+    // Lọc bỏ null (trường hợp API lỗi)
+    favoriteBooks.value = books.filter(b => b);
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách sách yêu thích:", error);
+    favoriteBooks.value = [];
+  }
+}
+
+
+
+
+onMounted(async () => {
+  if (userInfo?.user_id) {
+    await fetchFavoriteBook(userInfo.user_id);
+  }
+});
+
 
 
 </script>
@@ -57,7 +130,7 @@ const favoriteBooks = ref([]);
                 <template v-if="favoriteBooks.length > 0">
                     <div v-for="book in favoriteBooks.slice(0, 5)" :key="book.id"
                         class="w-14 h-20 rounded overflow-hidden shadow hover:scale-105 transition">
-                        <img :src="book.cover" :alt="book.title" class="w-full h-full object-cover" />
+                        <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" :alt="book.title" class="w-full h-full object-cover" />
                     </div>
                 </template>
             </div>
