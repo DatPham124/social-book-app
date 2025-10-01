@@ -2,7 +2,7 @@ from datetime import date
 from typing import Optional, List
 from enum import Enum
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, Enum as SqlEnum, UniqueConstraint
+from sqlalchemy import Boolean, Column, Enum as SqlEnum, UniqueConstraint
 
 
 class BookCategoryLink(SQLModel, table=True):
@@ -49,8 +49,8 @@ class UserBookStatus(SQLModel, table=True):
     start_date: Optional[date] = None 
     finish_date: Optional[date] = None
     updated_at: date = Field(default_factory=date.today)
-
-
+    is_favorite: bool = Field(default=False, nullable=False)
+    
 class ReadingProgress(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(index=True, nullable=False)

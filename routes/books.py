@@ -79,6 +79,37 @@ def get_all_status_books(session: Session = Depends(get_session_book_service)):
     status = session.exec(statement).all()
     return status
 
+@router.get('/favorite/{user_id}', response_model=list[UserBookStatus])
+def get_favorite_book_by_user(user_id: int, session: Session = Depends(get_session_book_service)):
+    statement = select(UserBookStatus).where(
+        and_(
+            UserBookStatus.user_id == user_id,
+            UserBookStatus.is_favorite == True
+        )
+    )
+    
+    results = session.exec(statement).all()
+    return results
+
+@router.put('/favorite/update/{book_id}/{user_id}')
+def change_favorite_stage(book_id: int, user_id: int, session: Session = Depends(get_session_book_service)):
+    statement = select(UserBookStatus).where(
+        UserBookStatus.user_id == user_id,
+        UserBookStatus.book_id == book_id
+    )
+    
+    user_book = session.exec(statement).first()
+    
+    if not user_book:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi cho user và book này")
+    
+    user_book.is_favorite = not user_book.is_favorite
+    session.add(user_book)
+    session.commit()
+    session.refresh(user_book)
+    
+    return {"book_id": book_id, "user_id": user_id, "is_favorite": user_book.is_favorite}
+
 
 @router.post('/status/add')
 def add_book_status(status_change: str, book_id: int, user_id: int, session: Session = Depends(get_session_book_service)):
@@ -275,4 +306,5 @@ def update_reading_progress(
     session.refresh(progress)
     
     return progress
+
 
