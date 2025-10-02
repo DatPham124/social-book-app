@@ -2,9 +2,12 @@ import { createRouter, createWebHistory } from "vue-router";
 import Home from "../views/Home.vue";
 import Login from "../views/Login.vue";
 import Profile from "../views/Profile.vue";
-import EditProfile from "../components/EditProfile.vue";
-import Register from "../components/RegisterForm.vue";
-import ViewAllCurrentlyReadingBook from "../components/ViewAllCurrentlyReadingBook.vue";
+import EditProfile from "../components/profile/EditProfile.vue";
+import Register from "../components/auth/RegisterForm.vue";
+import ViewAllCurrentlyReadingBook from "../components/books/ViewAllCurrentlyReadingBook.vue";
+import ViewAllReadBook from '../components/books/ViewAllReadBook.vue'
+import ViewAllToReadBook from '../components/books/ViewAllToReadBook.vue'
+
 
 const routes = [
   { path: "/login", name: "Login", component: Login },
@@ -12,7 +15,9 @@ const routes = [
   { path: "/register", name: "register", component: Register },
   { path: "/profile", name: "profile", component: Profile },
   { path: "/profile/edit", name: "edit_profilefile", component: EditProfile },
-  { path: "/profile/view/curently", name: "'view_currently_reading_book", component: ViewAllCurrentlyReadingBook },
+  { path: "/profile/view/curently", name: "view_currently_reading_book", component: ViewAllCurrentlyReadingBook },
+  { path: "/profile/view/read", name: "view_all_read_book", component: ViewAllReadBook },
+  { path: "/profile/view/toread", name: "view_all_to_read_book", component: ViewAllToReadBook },
 
   { path: "/", redirect: "/login" },
 ];

@@ -2,7 +2,7 @@
 import { ref, watch, onBeforeUnmount } from "vue"
 import { useRouter } from "vue-router"
 import axios from "axios"
-import { USER_SERVICE_URL } from "../config.ts"
+import { USER_SERVICE_URL } from "../../config.ts"
 
 const username = ref("")
 const email = ref("")

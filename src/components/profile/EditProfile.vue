@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import Navbar from "../components/Navbar.vue";
+import Navbar from "../layout/Navbar.vue";
 import { computed, onMounted, ref } from "vue";
 import axios from "axios";
-import { USER_SERVICE_URL, AVATAR_SERVER_URL } from "../config";
+import { USER_SERVICE_URL, AVATAR_SERVER_URL } from "../../config";
 import { jwtDecode } from "jwt-decode";
 
 const errorMessage = ref("");

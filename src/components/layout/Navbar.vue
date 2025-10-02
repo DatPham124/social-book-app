@@ -1,10 +1,11 @@
 <script lang="ts" setup>
-import { ref } from "vue"
+import { onMounted, ref } from "vue"
 import { jwtDecode } from "jwt-decode"
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
-
+import { AVATAR_SERVER_URL, USER_SERVICE_URL } from '../../config'
+import axios from "axios"
 interface TokenPayLoad {
-    username: string 
+    username: string
     roles: number[]
     exp: number
     user_id: number
@@ -30,7 +31,28 @@ const signOut = () => {
     localStorage.removeItem('token');
     window.location.href = '/login';
 }
+
+const profile = ref<any>(null)
+
+async function get_profile_by_user() {
+    try {
+        const res = await axios.get(`${USER_SERVICE_URL}users/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        profile.value = res.data;
+    } catch (error: unknown) {
+        console.log("Không thể tải profile");
+    }
+}
+
+
+onMounted(async () => {
+    await get_profile_by_user()
+    }
+)
 </script>
+
+
 
 <template>
     <nav class="bg-white shadow-md">
@@ -54,47 +76,41 @@ const signOut = () => {
 
                 <div v-if="userInfo" class="relative">
                     <Menu as="div">
-                        <MenuButton class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
+                        <MenuButton
+                            class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
                             <span class="sr-only">Open user menu</span>
-                            <img src="../assets/default_avatar.jpg" alt="default avatar"
+                            <img :src="`${AVATAR_SERVER_URL}/${profile?.avatar_url}`" alt="avatar"
                                 class="w-10 h-10 rounded-full border border-gray-300">
                         </MenuButton>
-                        
-                        <transition 
-                            enter-active-class="transition ease-out duration-100"
+
+                        <transition enter-active-class="transition ease-out duration-100"
                             enter-from-class="transform opacity-0 scale-95"
                             enter-to-class="transform opacity-100 scale-100"
                             leave-active-class="transition ease-in duration-75"
                             leave-from-class="transform opacity-100 scale-100"
-                            leave-to-class="transform opacity-0 scale-95"
-                        >
-                            <MenuItems class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                            leave-to-class="transform opacity-0 scale-95">
+                            <MenuItems
+                                class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                                 <div class="px-4 py-2 text-sm text-gray-700 border-b">
                                     <strong class="font-medium">{{ userInfo.username }}</strong>
                                 </div>
                                 <MenuItem v-slot="{ active }">
-                                    <router-link
-                                      to="/profile"
-                                      :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']"
-                                    >
-                                        Hồ sơ của bạn
-                                    </router-link>
+                                <router-link to="/profile"
+                                    :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
+                                    Hồ sơ của bạn
+                                </router-link>
                                 </MenuItem>
                                 <MenuItem v-slot="{ active }">
-                                    <router-link
-                                      to="/settings"
-                                      :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']"
-                                    >
-                                        Cài đặt
-                                    </router-link>
+                                <router-link to="/settings"
+                                    :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
+                                    Cài đặt
+                                </router-link>
                                 </MenuItem>
                                 <MenuItem v-slot="{ active }">
-                                    <button
-                                      @click="signOut"
-                                      :class="[active ? 'bg-yellow-100' : '', 'block w-full text-left px-4 py-2 text-sm text-gray-700']"
-                                    >
-                                        Đăng xuất
-                                    </button>
+                                <button @click="signOut"
+                                    :class="[active ? 'bg-yellow-100' : '', 'block w-full text-left px-4 py-2 text-sm text-gray-700']">
+                                    Đăng xuất
+                                </button>
                                 </MenuItem>
                             </MenuItems>
                         </transition>

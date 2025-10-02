@@ -2,7 +2,7 @@
 import { ref } from "vue"
 import axios from "axios"
 import { useRouter } from "vue-router"
-import { USER_SERVICE_URL } from "../config.ts"
+import { USER_SERVICE_URL } from "../../config"
 
 const username = ref("");
 const password = ref("");

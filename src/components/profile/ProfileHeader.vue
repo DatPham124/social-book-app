@@ -2,7 +2,7 @@
 import { onMounted, ref } from "vue";
 import { jwtDecode } from "jwt-decode"
 import axios from "axios";
-import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from "../config";
+import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL, USER_SERVICE_URL, AVATAR_SERVER_URL } from "../../config";
 
 
 interface TokenPayLoad {
@@ -68,35 +68,47 @@ async function getBookByID(book_id: number) {
 }
 
 async function fetchFavoriteBook(userId: number) {
-  try {
-    // Lấy danh sách book_id từ bảng favorite
-    const favoriteList = await getFavorite(userId);
+    try {
+        // Lấy danh sách book_id từ bảng favorite
+        const favoriteList = await getFavorite(userId);
 
-    if (!favoriteList || favoriteList.length === 0) {
-      favoriteBooks.value = [];
-      return;
+        if (!favoriteList || favoriteList.length === 0) {
+            favoriteBooks.value = [];
+            return;
+        }
+
+        // Gọi API lấy chi tiết sách cho tất cả book_id song song
+        const books = await Promise.all(
+            favoriteList.map((fav: any) => getBookByID(fav.book_id))
+        );
+
+        // Lọc bỏ null (trường hợp API lỗi)
+        favoriteBooks.value = books.filter(b => b);
+    } catch (error) {
+        console.error("Lỗi khi lấy danh sách sách yêu thích:", error);
+        favoriteBooks.value = [];
     }
+}
 
-    // Gọi API lấy chi tiết sách cho tất cả book_id song song
-    const books = await Promise.all(
-      favoriteList.map((fav: any) => getBookByID(fav.book_id))
-    );
+const profile = ref<any>(null)
 
-    // Lọc bỏ null (trường hợp API lỗi)
-    favoriteBooks.value = books.filter(b => b);
-  } catch (error) {
-    console.error("Lỗi khi lấy danh sách sách yêu thích:", error);
-    favoriteBooks.value = [];
-  }
+async function get_profile_by_user() {
+    try {
+        const res = await axios.get(`${USER_SERVICE_URL}users/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        profile.value = res.data;
+    } catch (error: unknown) {
+        console.log("Không thể tải profile");
+    }
 }
 
 
-
-
 onMounted(async () => {
-  if (userInfo?.user_id) {
-    await fetchFavoriteBook(userInfo.user_id);
-  }
+    if (userInfo?.user_id) {
+        await get_profile_by_user()
+        await fetchFavoriteBook(userInfo.user_id);
+    }
 });
 
 
@@ -106,9 +118,9 @@ onMounted(async () => {
 <template>
     <div class="grid grid-cols-[2fr_1fr]">
         <div class="flex items-center space-x-3">
-            <div class="w-20 h-20 rounded-full bg-gray-300 flex items-center justify-center text-3xl text-white">
-                👤
-            </div>
+            <img :src="`${AVATAR_SERVER_URL}/${profile?.avatar_url}`" alt="avatar"
+                class="w-20 h-20 rounded-full bg-gray-300 flex items-center justify-center text-3xl text-white">
+
             <h2 class="text-4xl font-bold text-teal-700">{{ userInfo?.username }}</h2>
             <router-link to="/profile/edit" class="text-gray-400 hover:text-gray-600">
                 ✏️
@@ -130,7 +142,8 @@ onMounted(async () => {
                 <template v-if="favoriteBooks.length > 0">
                     <div v-for="book in favoriteBooks.slice(0, 5)" :key="book.id"
                         class="w-14 h-20 rounded overflow-hidden shadow hover:scale-105 transition">
-                        <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" :alt="book.title" class="w-full h-full object-cover" />
+                        <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" :alt="book.title"
+                            class="w-full h-full object-cover" />
                     </div>
                 </template>
             </div>
