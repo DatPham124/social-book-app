@@ -90,34 +90,38 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="bg-white p-6 rounded-lg shadow border">
+  <div class="bg-white p-6 rounded-lg shadow border h-[325px] flex flex-col">
+    <!-- Luôn nằm trên cùng -->
     <h3 class="text-lg font-semibold mb-4">
       Đã đọc ({{ books.length }})
     </h3>
 
-    <div v-if="loading">Đang tải...</div>
-    <div v-else-if="errorMessage" class="text-gray-500 italic">
-      {{ errorMessage }}
-    </div>
-    <div v-else>
-      <div class="flex space-x-4" :class="{'justify-center': books.length < 5}">
-        <div v-for="item in books.slice(0 ,4)" :key="item.book.id"
-          class="w-20 h-28 shadow rounded overflow-hidden bg-gray-100 flex items-center justify-center">
-          <img v-if="item.book.cover_url" :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`" :alt="item.book.title"
-            class="h-full w-full object-cover" />
-          <span v-else class="text-xs text-gray-500 p-1 text-center">
-            {{ item.book.title }}
-          </span>
-        </div>
+    <!-- Phần nội dung căn giữa -->
+    <div class="flex-1 flex flex-col justify-center">
+      <div v-if="loading" class="text-center">Đang tải...</div>
+      <div v-else-if="errorMessage" class="text-gray-500 italic text-center">
+        {{ errorMessage }}
       </div>
+      <div v-else class="space-y-10">
+        <div class="flex space-x-4 justify-center">
+          <div v-for="item in books.slice(0, 4)" :key="item.book.id"
+            class="w-20 h-28 shadow rounded overflow-hidden bg-gray-100 flex">
+            <img v-if="item.book.cover_url" :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`"
+              :alt="item.book.title" class="h-full w-full object-cover" />
+            <span v-else class="text-xs text-gray-500 p-1 text-center">
+              {{ item.book.title }}
+            </span>
+          </div>
+        </div>
 
-      <div class="mt-4 flex space-x-3 justify-center">
-        <router-link :to="{name: 'view_all_read_book'}" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
-          Xem tất cả
-        </router-link>
-        <button class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
-          Xem đánh giá
-        </button>
+        <div class="mt-4 flex space-x-3 justify-center">
+          <router-link to="/profile/view/read" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
+            Xem tất cả
+          </router-link>
+          <router-link to="/" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
+            Xem nhật ký
+          </router-link>
+        </div>
       </div>
     </div>
   </div>

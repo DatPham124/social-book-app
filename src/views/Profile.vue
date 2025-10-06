@@ -10,13 +10,13 @@ import ProfileHeader from "../components/profile/ProfileHeader.vue";
 
     <Navbar />
 
-    <div class="w-full max-w-6xl mx-auto">
+    <div class="w-full max-w-5xl mx-auto">
         <ProfileHeader />
 
         <div class="grid grid-cols-[2fr_1fr] gap-6">
 
 
-            <CurentlyReadingBooks />
+            <CurentlyReadingBooks class="h-[325px] flex items-center justify-center" />
 
             <div class="bg-white p-6 rounded-lg shadow border">
                 <p class="text-gray-700 mb-2">
@@ -34,9 +34,9 @@ import ProfileHeader from "../components/profile/ProfileHeader.vue";
                 </div>
             </div>
 
-            <Read />
+            <Read class="h-[325px] flex items-center justify-center" />
 
-            <ToReadPile />
+            <ToReadPile class="h-[325px]" />
         </div>
     </div>
 </template>

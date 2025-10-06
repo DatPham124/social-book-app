@@ -3,10 +3,11 @@ import axios from "axios";
 import { ref, onMounted } from "vue";
 import { jwtDecode } from "jwt-decode";
 import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from "../../config.ts";
+import { useBooks } from "../../composables/useBook.ts";
 
-const books = ref<any[]>([]); // mảng sách chi tiết
+const { getBookById, errorMessage } = useBooks();
+const books = ref<any[]>([]); 
 const loading = ref(true);
-const errorMessage = ref<string | null>(null);
 
 interface TokenPayLoad {
   username: string;
@@ -31,20 +32,6 @@ if (token) {
   }
 }
 
-async function get_book_by_id(book_id: number) {
-  try {
-    const response = await axios.get(`${BOOK_SERVICE_URL}books/${book_id}`);
-    return response.data; // dữ liệu chi tiết sách
-  } catch (error: unknown) {
-    if (axios.isAxiosError(error) && error.response) {
-      errorMessage.value = error.response.data.detail;
-    } else {
-      errorMessage.value = "Không thể kết nối đến server";
-    }
-    return null;
-  }
-}
-
 async function getCurrentlyReadingBooks() {
   if (!userInfo) {
     errorMessage.value = "Bạn chưa đăng nhập!";
@@ -64,7 +51,7 @@ async function getCurrentlyReadingBooks() {
 
     const detailedBooks = await Promise.all(
       statusList.map(async (item: any) => {
-        const book = await get_book_by_id(item.book_id);
+        const book = await getBookById(item.book_id);
         return { ...item, book };
       })
     );
@@ -94,50 +81,39 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="bg-white p-6 rounded-lg shadow border">
+  <div class="bg-white p-6 rounded-lg shadow border h-[325px] flex flex-col">
+    <!-- Luôn nằm trên cùng -->
     <h3 class="text-lg font-semibold mb-4">
       Đang đọc ({{ books.length }})
     </h3>
 
-    <div v-if="loading">Đang tải...</div>
-    <div v-else-if="errorMessage" class="text-gray-500 italic">
-      {{ errorMessage }}
-    </div>
-    <div v-else>
-      <div class="flex space-x-4" :class="{'justify-center': books.length < 5}">
-        <div
-          v-for="item in books.slice(0, 4) "
-          :key="item.book.id"
-          class="w-20 h-28 shadow rounded overflow-hidden bg-gray-100 flex"
-        >
-          <img
-            v-if="item.book.cover_url"
-            :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`"
-            :alt="item.book.title"
-            class="h-full w-full object-cover"
-          />
-          <!-- Nếu không có ảnh bìa thì hiện tên -->
-          <span v-else class="text-xs text-gray-500 p-1 text-center">
-            {{ item.book.title }}
-          </span>
-        </div>
+    <!-- Phần nội dung căn giữa -->
+    <div class="flex-1 flex flex-col justify-center">
+      <div v-if="loading" class="text-center">Đang tải...</div>
+      <div v-else-if="errorMessage" class="text-gray-500 italic text-center">
+        {{ errorMessage }}
       </div>
+      <div v-else class="space-y-10">
+        <div class="flex space-x-4 justify-center">
+          <div v-for="item in books.slice(0, 4)" :key="item.book.id"
+            class="w-20 h-28 shadow rounded overflow-hidden bg-gray-100 flex">
+            <img v-if="item.book.cover_url" :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`"
+              :alt="item.book.title" class="h-full w-full object-cover" />
+            <span v-else class="text-xs text-gray-500 p-1 text-center">
+              {{ item.book.title }}
+            </span>
+          </div>
+        </div>
 
-      <div class="mt-4 flex space-x-3 justify-center">
-        <router-link
-          to="/profile/view/curently"
-          class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm"
-        >
-          Xem tất cả
-        </router-link>
-        <router-link
-          to="/"
-          class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm"
-        >
-          Xem nhật ký
-        </router-link>
+        <div class="mt-4 flex space-x-3 justify-center">
+          <router-link to="/profile/view/curently" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
+            Xem tất cả
+          </router-link>
+          <router-link to="/" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
+            Xem nhật ký
+          </router-link>
+        </div>
       </div>
     </div>
   </div>
 </template>
-

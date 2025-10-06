@@ -1,6 +1,7 @@
 <script setup>
 import Navbar from '../components/layout/Navbar.vue';
 import HomeFeed from '../components/HomeFeed.vue';
+
 import { ref } from 'vue';
 
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
