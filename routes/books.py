@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, and_, or_, select
-from ..model import Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink
+from ..model import BookStatus, Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink
 from common_lib.database import get_session_book_service
 
 router = APIRouter(
@@ -68,10 +68,6 @@ def delete_book_by_id(book_id: int, session: Session = Depends(get_session_book_
     session.commit()
     return {"message": f"Book with id {book_id} has been deleted"}
 
-
-# -----------------------
-# BOOK STATUS
-# -----------------------
 
 @router.get('/status/all', response_model=list[UserBookStatus])
 def get_all_status_books(session: Session = Depends(get_session_book_service)):
@@ -213,7 +209,6 @@ def get_explore_books(
 
     results = []
     for book in books:
-        # Lấy category names
         category_names = [cat.name for cat in book.categories] if book.categories else []
         
         results.append({
@@ -224,7 +219,7 @@ def get_explore_books(
             "published_date": book.published_date,
             "language": book.language,
             "authorID": book.authorID,
-            "categories": category_names,  # Trả về mảng categories
+            "categories": category_names,  
             "status": "to_read"
         })
     
@@ -238,8 +233,6 @@ def get_book_categories(book_id: int, session: Session = Depends(get_session_boo
         raise HTTPException(status_code=404, detail="Book not found")
     
     return book.categories
-
-# Thêm vào routes books.py
 
 @router.get("/reading-progress/{user_id}/{book_id}")
 def get_reading_progress(
@@ -306,5 +299,43 @@ def update_reading_progress(
     session.refresh(progress)
     
     return progress
+
+@router.get("/status/{user_id}/{book_id}")
+def get_book_status(user_id: int, book_id: int, session: Session = Depends(get_session_book_service)):
+    status = session.exec(
+        select(UserBookStatus).where(
+            UserBookStatus.user_id == user_id,
+            UserBookStatus.book_id == book_id
+        )
+    ).first()
+
+    if not status:
+        status = UserBookStatus(
+            user_id=user_id,
+            book_id=book_id,
+            status=BookStatus.to_read
+        )
+        session.add(status)
+        session.commit()
+        session.refresh(status)
+
+    return status
+
+@router.delete("/status/{user_id}/{book_id}")
+def delete_book_status(user_id: int, book_id: int, session: Session = Depends(get_session_book_service)):
+    status_record = session.exec(
+        select(UserBookStatus).where(
+            UserBookStatus.user_id == user_id,
+            UserBookStatus.book_id == book_id
+        )
+    ).first()
+
+    if not status_record:
+        raise HTTPException(status_code=404, detail="Không tìm thấy trạng thái sách")
+
+    session.delete(status_record)
+    session.commit()
+
+    return {"message": "Xóa trạng thái thành công"}
 
 

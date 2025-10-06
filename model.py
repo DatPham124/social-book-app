@@ -37,6 +37,7 @@ class BookStatus(str, Enum):  # dùng Python Enum
     currently_reading = "currently_reading"
     read = "read"
     did_not_finish = "dnf"
+    rm_book = "rm_book"
 
 
 class UserBookStatus(SQLModel, table=True):
