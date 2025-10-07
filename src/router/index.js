@@ -10,6 +10,7 @@ import ViewAllCurrentlyReadingBook from "../components/books/ViewAllCurrentlyRea
 import ViewAllReadBook from '../components/books/ViewAllReadBook.vue'
 import ViewAllToReadBook from '../components/books/ViewAllToReadBook.vue'
 import ReviewBook from "../components/books/ReviewBook.vue";
+import ListReview from "../components/books/ListReview.vue"
 
 const routes = [
   { path: "/login", name: "Login", component: Login },
@@ -22,7 +23,8 @@ const routes = [
   { path: "/profile/view/toread", name: "view_all_to_read_book", component: ViewAllToReadBook },
   { path: "/book/:id", name: "book", component: Book },
   { path: "/book/:id/review", name: "ReviewBook", component: ReviewBook },
-
+ 
+  { path: "/book/:id/list-review", name: "ListReview", component:  ListReview},
 
   { path: "/", redirect: "/login" },
 ];

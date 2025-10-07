@@ -1,7 +1,7 @@
 // Trong useBooks.ts
 import axios from "axios";
 import { ref } from "vue";
-import { BOOK_SERVICE_URL } from "../config";
+import { BOOK_SERVICE_URL, REVIEW_SERVICE_URL } from "../config";
 
 export function useBooks() {
   const errorMessage = ref<string | null>(null);
@@ -79,6 +79,28 @@ export function useBooks() {
     });
   }
 
+  async function getAverage(book_id: number) {
+  try {
+    const response = await axios.get(`${REVIEW_SERVICE_URL}review/${book_id}/average-rating`)
+     return response.data; 
+  }
+  catch(error) {
+    console.log("Lỗi khi lấy trung bình đánh giá: ", error);
+    return null;
+  }
+}
+
+async function getReviewCount(book_id: number) {
+  try {
+    const response = await axios.get(`${REVIEW_SERVICE_URL}review/${book_id}/review-count`);
+    return response.data;
+  } catch (error) {
+    console.error("Lỗi khi lấy số lượng đánh giá:", error);
+    return null;
+  }
+}
+
+
   async function fetchBook(bookId: number, userId?: number) {
     try {
       const bookData = await getBookById(bookId);
@@ -97,6 +119,10 @@ export function useBooks() {
 
       const userStatus = userId ? await getUserBookStatus(userId, bookData.id) : null;
 
+      const averageRating = await getAverage(bookData.id)
+
+      const reviewCount = await getReviewCount(bookData.id)
+
       const current_page = progress?.current_page || 0;
       const total_pages = bookData.page_count || 0;
       const progress_percentage =
@@ -112,8 +138,8 @@ export function useBooks() {
         newPage: current_page,
         status: userStatus?.status || "to_read", // 👈 trạng thái thật của user
         start_date: userStatus?.start_date || null,
-        rating: 4.2,
-        review_count: 15,
+        rating: 4.5,
+        review_count: reviewCount?.review_count || 0,
         warnings: [],
       };
     } catch (error) {
@@ -142,9 +168,11 @@ export function useBooks() {
     getAuthor,
     getReadingProgress,
     getUserBookStatus,
-    fetchBook, // ✅ thêm bản nâng cấp
+    fetchBook, 
     fetchBooksByStatus,
     formatDate,
+    getAverage,
+    getReviewCount,
     errorMessage,
   };
 }

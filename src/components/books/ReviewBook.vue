@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
+import { REVIEW_SERVICE_URL } from "../../config";
 import { useBooks } from "../../composables/useBook";
-import Navbar from "../layout/Navbar.vue";
+import Navbar from "../../components/layout/Navbar.vue";
+import { useAuth } from "../../composables/useAuth";
+import axios from "axios";
+
+const { userInfo } = useAuth()
+
 
 const route = useRoute();
 const { getBookById } = useBooks();
 
 const bookId = Number(route.params.id);
 const book = ref<any>(null);
+
+
 
 const review = ref({
   mood: [] as string[],
@@ -19,7 +27,7 @@ const review = ref({
   diversity: "",
   flawsFocus: "",
   rating: 0,
-  notes: "",
+  content: "",
   themes: "",
   warnings: "",
 });
@@ -30,14 +38,52 @@ const moods = [
   "buồn", "xúc động", "hài hước", "bí ẩn", "căng thẳng"
 ];
 
+
+async function addReview(userId: number, bookId: number, rating: number, content: string) {
+  try {
+    const response = await axios.post(`${REVIEW_SERVICE_URL}review/add`,
+      null,
+      {
+        params: {
+          user_id: userId,
+          book_id: bookId,
+          rating: rating,
+          content: content
+        }
+      }
+    )
+    console.log("Thêm đánh giá thành công:", response.data);
+  } catch (error) {
+    console.log("Có lỗi khi thêm bình luận: ",error)
+  }
+}
+
+async function submitReview() {
+  if (!userInfo.value) {
+    alert("Vui lòng đăng nhập trước khi đánh giá sách!");
+    return;
+  }
+
+  try {
+    await addReview(
+      userInfo.value.user_id,
+      bookId,
+      review.value.rating,
+      review.value.content 
+    );
+    alert("Cảm ơn bạn đã gửi đánh giá!");
+  } catch (error) {
+    console.error("Lỗi khi gửi đánh giá:", error);
+    alert("Không thể gửi đánh giá, vui lòng thử lại sau.");
+  }
+}
+
+
+
 onMounted(async () => {
   book.value = await getBookById(bookId);
 });
 
-function submitReview() {
-  console.log("Dữ liệu đánh giá:", review.value);
-  alert("Cảm ơn bạn đã gửi đánh giá!");
-}
 </script>
 
 <template>
@@ -50,7 +96,7 @@ function submitReview() {
     </p>
 
     <div class="bg-white border border-gray-200 rounded-xl shadow-md p-6 space-y-6">
-      <!-- Mood -->
+      <!-- Mood
       <div>
         <h3 class="font-semibold mb-2 text-gray-800">Cuốn sách này phù hợp với tâm trạng:</h3>
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -70,7 +116,6 @@ function submitReview() {
         </div>
       </div>
 
-      <!-- Pace -->
       <div>
         <h3 class="font-semibold mb-2 text-gray-800">Tốc độ của sách:</h3>
         <div class="flex gap-4 text-gray-700">
@@ -80,7 +125,6 @@ function submitReview() {
         </div>
       </div>
 
-      <!-- Select questions -->
       <div class="space-y-4">
         <div>
           <label class="block mb-1 text-gray-700">Cốt truyện thiên về:</label>
@@ -127,60 +171,37 @@ function submitReview() {
           </select>
         </div>
       </div>
-
-      <!-- Rating -->
+    -->
       <div>
         <label class="block mb-2 font-semibold text-gray-800">Đánh giá sao (0–5):</label>
-        <input
-          type="number"
-          min="0"
-          max="5"
-          step="0.5"
-          v-model.number="review.rating"
-          class="w-24 text-center rounded-md border border-gray-300 p-1 focus:ring-2 focus:ring-yellow-400"
-        />
+        <input type="number" min="0" max="5" step="0.5" v-model.number="review.rating"
+          class="w-24 text-center rounded-md border border-gray-300 p-1 focus:ring-2 focus:ring-yellow-400" />
       </div>
 
-      <!-- Notes -->
       <div>
         <label class="block mb-2 font-semibold text-gray-800">Ghi chú hoặc cảm nhận:</label>
-        <textarea
-          v-model="review.notes"
-          class="w-full rounded-md border border-gray-300 p-3 focus:ring-2 focus:ring-yellow-400"
-          rows="4"
-          placeholder="Chia sẻ cảm nhận của bạn về cuốn sách..."
-        ></textarea>
+        <textarea v-model="review.content"
+          class="w-full rounded-md border border-gray-300 p-3 focus:ring-2 focus:ring-yellow-400" rows="4"
+          placeholder="Chia sẻ cảm nhận của bạn về cuốn sách..."></textarea>
       </div>
-
-      <!-- Themes -->
       <div>
         <label class="block mb-2 font-semibold text-gray-800">Chủ đề hoặc thông điệp chính:</label>
-        <input
-          v-model="review.themes"
-          type="text"
+        <input v-model="review.themes" type="text"
           class="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-yellow-400"
-          placeholder="Ví dụ: tình bạn, khám phá, tự do..."
-        />
+          placeholder="Ví dụ: tình bạn, khám phá, tự do..." />
       </div>
 
-      <!-- Warnings -->
       <div>
         <label class="block mb-2 font-semibold text-gray-800">Cảnh báo nội dung (nếu có):</label>
-        <textarea
-          v-model="review.warnings"
-          class="w-full rounded-md border border-gray-300 p-3 focus:ring-2 focus:ring-yellow-400"
-          rows="2"
-          placeholder="Ví dụ: bạo lực, trầm cảm..."
-        ></textarea>
+        <textarea v-model="review.warnings"
+          class="w-full rounded-md border border-gray-300 p-3 focus:ring-2 focus:ring-yellow-400" rows="2"
+          placeholder="Ví dụ: bạo lực, trầm cảm..."></textarea>
       </div>
 
-      <!-- Submit -->
       <div class="pt-4 text-right">
-        <button
-          @click="submitReview"
-          class="px-6 py-2 bg-yellow-400 text-gray-900 rounded-md font-semibold hover:bg-yellow-500 transition-colors"
-        >
-        Lưu đánh giá
+        <button @click="submitReview"
+          class="px-6 py-2 bg-yellow-400 text-gray-900 rounded-md font-semibold hover:bg-yellow-500 transition-colors">
+          Lưu đánh giá
         </button>
       </div>
     </div>
