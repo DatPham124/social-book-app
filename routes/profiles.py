@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from sqlalchemy import select
 from sqlmodel import Session
 from common_lib.database import get_session_user_service
 from ..model import Profile, User
@@ -67,15 +68,32 @@ def get_profile(
     return profile
 
 
-@router.get("/profile/{user_id}", response_model=Profile)
+@router.get("/profile/{user_id}")
 def get_profile_by_id(
     user_id: int,
     session: Session = Depends(get_session_user_service)
 ):
-    profile = session.get(Profile, user_id)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
-    return profile
+    statement = (
+        select(User, Profile)
+        .join(Profile, Profile.user_id == User.id, isouter=True)
+        .where(User.id == user_id)
+    )
+
+    result = session.exec(statement).first()  
+    if not result:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+    user, profile = result  
+
+    return {
+        "user_id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "full_name": profile.full_name if profile else None,
+        "bio": profile.bio if profile else None,
+        "avatar_url": profile.avatar_url if profile else None,
+        "created_at": user.created_at,
+    }
 
 
 @router.put("/me/avatar")
