@@ -1,5 +1,6 @@
 from datetime import date
 from typing import Optional
+from sqlalchemy import Text
 from sqlmodel import SQLModel, Field, UniqueConstraint
 
 
@@ -8,9 +9,9 @@ class Reviews(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key= True)
     user_id: int = Field(nullable=False, index=True)
     book_id: int = Field(nullable=False, index=True)
-    rating: int = Field(nullable=False, index=True)
-    content: Optional[str] = None
-    created_at: date = Field(default_factory=date)
+    rating: float = Field(nullable=False, index=True)
+    content: Optional[str] = Field(sa_column=Field(default=None, sa_column=Text()))    
+    created_at: date = Field(default_factory=date.today)
 
 class Likes(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("user_id", "review_id"),) 

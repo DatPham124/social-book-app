@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from ..model import Reviews
 from sqlmodel import Session, select
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,11 +11,13 @@ router = APIRouter(
 )
 
 @router.post("/add", response_model=Reviews)
-def add_review(review: Reviews, session: Session = Depends(get_session_review_service)):
-    session.add(review)
+def add_review(user_id: int, book_id: int, rating: float, content: str , session: Session = Depends(get_session_review_service)):
+    
+    review_data = Reviews(user_id=user_id, book_id=book_id, rating=rating, content=content)
+    session.add(review_data)
     session.commit()
-    session.refresh(review)
-    return review
+    session.refresh(review_data)
+    return review_data
 
 @router.get("/{bookID}", response_model=list[Reviews])
 def get_all_review_by_bookID(bookID: int, session: Session = Depends(get_session_review_service)):
@@ -72,3 +75,18 @@ def delete_review(reviewID: int, session: Session = Depends(get_session_review_s
     session.commit()
 
     return {"message": f"review with id {reviewID} has been deleted"}
+
+@router.get("/{book_id}/average-rating")
+def get_average_rating(book_id: int, session: Session = Depends(get_session_review_service)):
+    result = session.exec(
+        select(func.avg(Reviews.rating)).where(Reviews.book_id == book_id)
+    ).one_or_none()
+    avg_rating = result if result is not None else 0
+    return {"book_id": book_id, "average_rating": round(avg_rating, 2)}    
+
+@router.get("/{book_id}/review-count")
+def get_review_count(book_id: int, session: Session = Depends(get_session_review_service)):
+    count = session.exec(
+        select(func.count()).where(Reviews.book_id == book_id)
+    ).one()
+    return {"review_count": count}
