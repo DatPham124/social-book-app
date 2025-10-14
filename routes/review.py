@@ -19,7 +19,7 @@ def add_review(user_id: int, book_id: int, rating: float, content: str , session
     session.refresh(review_data)
     return review_data
 
-@router.get("/{bookID}", response_model=list[Reviews])
+@router.get("/book/{bookID}", response_model=list[Reviews])
 def get_all_review_by_bookID(bookID: int, session: Session = Depends(get_session_review_service)):
     statement = select(Reviews).where(Reviews.book_id == bookID)
     review_by_bookID = session.exec(statement).all()
@@ -36,6 +36,14 @@ def get_all_review_by_bookID(bookID: int, session: Session = Depends(get_session
 def get_all_review(session: Session = Depends(get_session_review_service)):
     statement = select(Reviews)
     reviews = session.exec(statement).all()
+
+    return reviews
+
+@router.get("/{reviewId}", response_model=Reviews)
+def get_review_by_reviewId(reviewId: int , session: Session = Depends(get_session_review_service)):
+    
+    statement = select(Reviews).where(Reviews.id == reviewId)
+    reviews = session.exec(statement).first()
 
     return reviews
 
@@ -90,3 +98,12 @@ def get_review_count(book_id: int, session: Session = Depends(get_session_review
         select(func.count()).where(Reviews.book_id == book_id)
     ).one()
     return {"review_count": count}
+
+
+@router.get("/{bookId}/{userId}")
+def get_review_by_userid(bookId: int, userId: int, session: Session = Depends(get_session_review_service)):
+    statement = select(Reviews).where(Reviews.user_id == userId, Reviews.book_id == bookId)
+    result = session.exec(statement).first()
+    return result
+
+

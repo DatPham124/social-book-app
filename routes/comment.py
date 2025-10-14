@@ -59,7 +59,6 @@ def update_comment(comment_data: Comments, commentID: int, session: Session = De
             detail="comment not found"
         )
 
-    # Only content is updatable for comments
     if comment_data.content is not None:
         comment.content = comment_data.content
 
