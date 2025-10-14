@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
 import Navbar from "../../components/layout/Navbar.vue";
 import { COVER_IMAGE_SERVER_URL, REVIEW_SERVICE_URL, USER_SERVICE_URL, AVATAR_SERVER_URL } from "../../config";
 import axios from "axios";
 import { useAuth } from "../../composables/useAuth";
 import { useBooks } from "../../composables/useBook";
+
+const { userInfo } = useAuth()
+
+
+const userID_from_token = computed(() => userInfo.value?.user_id);
 
 const { getBookById } = useBooks();
 const route = useRoute();
@@ -33,7 +38,7 @@ function renderStars(rating: number) {
 
 async function getReview(bookId: number) {
     try {
-        const response = await axios.get(`${REVIEW_SERVICE_URL}review/${bookId}`);
+        const response = await axios.get(`${REVIEW_SERVICE_URL}review/book/${bookId}`);
         return response.data;
     }
     catch (error) {
@@ -73,6 +78,8 @@ onMounted(async () => {
             ...r,
             user: profile[index]
         }))
+
+        console.log(reviews.value)
 
         const sum = reviews.value.reduce((acc, r) => acc + r.rating, 0);
         average.value = reviews.value.length ? sum / reviews.value.length : 0;
@@ -118,24 +125,29 @@ onMounted(async () => {
             <div class="space-y-6">
                 <div v-for="(review, index) in reviews" :key="index" class="bg-white border rounded-lg p-6 shadow-sm">
                     <div class="flex items-start gap-3 mb-3">
-                        <div
-                            class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-700 overflow-hidden shadow-sm">
-                            <template v-if="review.user?.avatar_url">
-                                <img :src="`${AVATAR_SERVER_URL}/${review.user.avatar_url}`" alt="Avatar người dùng"
-                                    class="w-full h-full object-cover" />
-                            </template>
-                            <template v-else>
-                                {{ review.user?.username?.charAt(0)?.toUpperCase() || "U" }}
-                            </template>
-                        </div>
+                        <router-link :to="{ name: 'profile', params: { id: review.user_id } }">
 
+                            <div
+                                class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-700 overflow-hidden shadow-sm">
+                                <template v-if="review.user?.avatar_url">
+                                    <img :src="`${AVATAR_SERVER_URL}/${review.user.avatar_url}`" alt="Avatar người dùng"
+                                        class="w-full h-full object-cover" />
+                                </template>
+                                <template v-else>
+                                    {{ review.user?.username?.charAt(0)?.toUpperCase() || "U" }}
+                                </template>
+                            </div>
+                        </router-link>
 
                         <div class="flex flex-col flex-1">
-                            <p class="font-semibold text-gray-800">
-                                {{ review.user?.username || "Người dùng ẩn danh" }} <span
-                                    class="text-gray-500 text-sm font-normal">đánh
-                                    giá</span>
-                            </p>
+                            <router-link :to="{ name: 'profile', params: { id: review.user_id } }">
+
+                                <p class="font-semibold text-gray-800">
+                                    {{ review.user?.username || "Người dùng ẩn danh" }} <span
+                                        class="text-gray-500 text-sm font-normal">đánh
+                                        giá</span>
+                                </p>
+                            </router-link>
 
                             <div class="flex items-center gap-1 text-yellow-500 text-sm mt-1">
                                 <template v-for="(type, i) in renderStars(review.rating)" :key="i">
@@ -143,16 +155,30 @@ onMounted(async () => {
                                     <font-awesome-icon v-else-if="type === 'half'" icon="fa-solid fa-star-half-alt" />
                                     <font-awesome-icon v-else icon="fa-regular fa-star" />
                                 </template>
-                                <span class="text-gray-700 ml-1 text-sm font-medium">{{ review.rating.toFixed(1)
-                                }}</span>
+                                <span class="text-gray-700 ml-1 text-sm font-medium">{{ review.rating.toFixed(1)}}</span>
                             </div>
+
                         </div>
+
+                        <router-link :to="{ name: 'DetailReview', params: { bookId: bookId, reviewId: review.id } }"
+                            v-if="review.user_id === userID_from_token"
+                            class="text-gray-400 hover:text-yellow-500 transition transform hover:scale-110"
+                            title="Chỉnh sửa đánh giá">
+                            <font-awesome-icon icon="fa-solid fa-circle-arrow-right" class="text-2xl" />
+                            </ router-link>
+
+
                     </div>
+
+
 
                     <p class="text-gray-700 text-sm leading-relaxed mb-3 transition-all duration-300"
                         :class="!expanded[index] ? 'line-clamp-3' : ''">
                         {{ review.content || "Người dùng này không để lại bình luận nào." }}
                     </p>
+
+
+
 
                     <!-- Nút xem thêm / ẩn bớt -->
                     <button v-if="review.content?.length > 150"
@@ -161,10 +187,12 @@ onMounted(async () => {
                         {{ expanded[index] ? 'Ẩn bớt' : 'Xem thêm' }}
                     </button>
 
+
+
                 </div>
             </div>
         </div>
     </div>
 </template>
 
-<style scoped></style>
+    <style scoped></style>

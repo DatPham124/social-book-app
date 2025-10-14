@@ -95,9 +95,15 @@ onMounted(async () => {
                                     <strong class="font-medium">{{ userInfo.username }}</strong>
                                 </div>
                                 <MenuItem v-slot="{ active }">
-                                <router-link to="/profile"
+                                <router-link :to="{name: 'profile', params: {id: userInfo.user_id}}"
                                     :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
                                     Hồ sơ của bạn
+                                </router-link>
+                                </MenuItem>
+                                <MenuItem v-slot="{ active }">
+                                <router-link :to="{name: 'Notification'}"
+                                    :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
+                                    Thông báo
                                 </router-link>
                                 </MenuItem>
                                 <MenuItem v-slot="{ active }">

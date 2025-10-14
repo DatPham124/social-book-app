@@ -6,57 +6,101 @@ import { useBooks } from "../../composables/useBook";
 import Navbar from "../../components/layout/Navbar.vue";
 import { useAuth } from "../../composables/useAuth";
 import axios from "axios";
+import { useRouter } from "vue-router";
+const router = useRouter();
 
-const { userInfo } = useAuth()
-
-
+const { userInfo } = useAuth();
 const route = useRoute();
 const { getBookById } = useBooks();
 
 const bookId = Number(route.params.id);
 const book = ref<any>(null);
-
-
+const review_data = ref<any>(null);
 
 const review = ref({
-  mood: [] as string[],
-  pace: "",
-  plotType: "",
-  characterDev: "",
-  loveable: "",
-  diversity: "",
-  flawsFocus: "",
   rating: 0,
   content: "",
-  themes: "",
-  warnings: "",
 });
 
-const moods = [
-  "phiêu lưu", "hy vọng", "suy ngẫm", "thử thách",
-  "thông tin", "thư giãn", "tối tăm", "truyền cảm hứng",
-  "buồn", "xúc động", "hài hước", "bí ẩn", "căng thẳng"
-];
+async function deleteReview() {
+  if (!review_data.value) {
+    alert("Không có đánh giá nào để xóa.");
+    return;
+  }
+
+  const confirmDelete = confirm("Bạn có chắc chắn muốn xóa đánh giá này không?");
+  if (!confirmDelete) return;
+
+  try {
+    await axios.delete(`${REVIEW_SERVICE_URL}review/delete/${review_data.value.id}`);
+    alert("Đã xóa đánh giá thành công!");
+    review_data.value = null;
+    review.value.rating = 0;
+    review.value.content = "";
+  } catch (error) {
+    console.error("Lỗi khi xóa đánh giá:", error);
+    alert("Không thể xóa đánh giá, vui lòng thử lại sau.");
+  } finally {
+    router.push(`/book/${bookId}`);
+  }
+}
+
+
+
+async function getReview(userId: number, bookId: number) {
+  try {
+    const response = await axios.get(`${REVIEW_SERVICE_URL}review/${bookId}/${userId}`);
+    if (response.data) {
+      review_data.value = response.data;
+      review.value.rating = response.data.rating;
+      review.value.content = response.data.content;
+      console.log("Đã tải review cũ:", response.data);
+    }
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      console.log("Người dùng chưa có đánh giá cho cuốn này.");
+    } else {
+      console.error("Lỗi khi tải review:", error);
+    }
+  } 
+}
 
 
 async function addReview(userId: number, bookId: number, rating: number, content: string) {
   try {
-    const response = await axios.post(`${REVIEW_SERVICE_URL}review/add`,
-      null,
-      {
-        params: {
-          user_id: userId,
-          book_id: bookId,
-          rating: rating,
-          content: content
-        }
-      }
-    )
+    const response = await axios.post(`${REVIEW_SERVICE_URL}review/add`, null, {
+      params: {
+        user_id: userId,
+        book_id: bookId,
+        rating: rating,
+        content: content,
+      },
+    });
     console.log("Thêm đánh giá thành công:", response.data);
+    return response.data;
+
   } catch (error) {
-    console.log("Có lỗi khi thêm bình luận: ",error)
+    console.error("Có lỗi khi thêm bình luận:", error);
+
+    throw error;
+  } 
+}
+
+
+async function updateReview(reviewId: number, rating: number, content: string) {
+  try {
+    const response = await axios.put(`${REVIEW_SERVICE_URL}review/update/${reviewId}`, {
+      rating: rating,
+      content: content,
+    });
+    console.log("Cập nhật đánh giá thành công:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Lỗi khi cập nhật review:", error);
+    throw error;
   }
 }
+
 
 async function submitReview() {
   if (!userInfo.value) {
@@ -64,114 +108,47 @@ async function submitReview() {
     return;
   }
 
-  try {
-    await addReview(
-      userInfo.value.user_id,
-      bookId,
-      review.value.rating,
-      review.value.content 
-    );
-    alert("Cảm ơn bạn đã gửi đánh giá!");
-  } catch (error) {
-    console.error("Lỗi khi gửi đánh giá:", error);
-    alert("Không thể gửi đánh giá, vui lòng thử lại sau.");
+  if (review.value.rating <= 0) {
+    alert("Vui lòng chọn điểm đánh giá (0–5).");
+    return;
   }
-}
 
+  try {
+    if (review_data.value) {
+      await updateReview(review_data.value.id, review.value.rating, review.value.content);
+      alert("Cập nhật đánh giá thành công!");
+    } else {
+      await addReview(userInfo.value.user_id, bookId, review.value.rating, review.value.content);
+      alert("Cảm ơn bạn đã gửi đánh giá!");
+    }
+
+    await getReview(userInfo.value.user_id, bookId);
+  } catch (error) {
+    alert("Không thể gửi đánh giá, vui lòng thử lại sau.");
+  } 
+}
 
 
 onMounted(async () => {
   book.value = await getBookById(bookId);
+  if (userInfo.value) {
+    await getReview(userInfo.value.user_id, bookId);
+  }
 });
-
 </script>
 
 <template>
   <Navbar />
 
   <div class="max-w-3xl mx-auto py-10 px-6">
-    <h1 class="text-2xl font-bold text-gray-800 mb-2">Thêm đánh giá</h1>
+    <h1 class="text-2xl font-bold text-gray-800 mb-2">
+      {{ review_data ? "Cập nhật đánh giá" : "Thêm đánh giá" }}
+    </h1>
     <p class="mb-6 text-gray-600">
       {{ book?.title ? `${book.title} — ${book.author || "Tác giả không rõ"}` : "Đang tải thông tin sách..." }}
     </p>
 
     <div class="bg-white border border-gray-200 rounded-xl shadow-md p-6 space-y-6">
-      <!-- Mood
-      <div>
-        <h3 class="font-semibold mb-2 text-gray-800">Cuốn sách này phù hợp với tâm trạng:</h3>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          <label
-            v-for="m in moods"
-            :key="m"
-            class="flex items-center gap-2 cursor-pointer text-gray-700"
-          >
-            <input
-              type="checkbox"
-              :value="m"
-              v-model="review.mood"
-              class="accent-yellow-500"
-            />
-            <span>{{ m }}</span>
-          </label>
-        </div>
-      </div>
-
-      <div>
-        <h3 class="font-semibold mb-2 text-gray-800">Tốc độ của sách:</h3>
-        <div class="flex gap-4 text-gray-700">
-          <label><input type="radio" v-model="review.pace" value="chậm" class="accent-yellow-500" /> Chậm</label>
-          <label><input type="radio" v-model="review.pace" value="trung bình" class="accent-yellow-500" /> Trung bình</label>
-          <label><input type="radio" v-model="review.pace" value="nhanh" class="accent-yellow-500" /> Nhanh</label>
-        </div>
-      </div>
-
-      <div class="space-y-4">
-        <div>
-          <label class="block mb-1 text-gray-700">Cốt truyện thiên về:</label>
-          <select v-model="review.plotType" class="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-yellow-400">
-            <option value="">-- Chọn --</option>
-            <option value="cốt truyện">Cốt truyện</option>
-            <option value="nhân vật">Nhân vật</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block mb-1 text-gray-700">Nhân vật có phát triển mạnh không?</label>
-          <select v-model="review.characterDev" class="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-yellow-400">
-            <option value="">-- Chọn --</option>
-            <option value="có">Có</option>
-            <option value="không">Không</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block mb-1 text-gray-700">Bạn có thấy các nhân vật đáng yêu không?</label>
-          <select v-model="review.loveable" class="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-yellow-400">
-            <option value="">-- Chọn --</option>
-            <option value="có">Có</option>
-            <option value="không">Không</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block mb-1 text-gray-700">Dàn nhân vật có đa dạng không?</label>
-          <select v-model="review.diversity" class="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-yellow-400">
-            <option value="">-- Chọn --</option>
-            <option value="có">Có</option>
-            <option value="không">Không</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block mb-1 text-gray-700">Khiếm khuyết của nhân vật chính có là trọng tâm không?</label>
-          <select v-model="review.flawsFocus" class="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-yellow-400">
-            <option value="">-- Chọn --</option>
-            <option value="có">Có</option>
-            <option value="không">Không</option>
-          </select>
-        </div>
-      </div>
-    -->
       <div>
         <label class="block mb-2 font-semibold text-gray-800">Đánh giá sao (0–5):</label>
         <input type="number" min="0" max="5" step="0.5" v-model.number="review.rating"
@@ -179,29 +156,24 @@ onMounted(async () => {
       </div>
 
       <div>
-        <label class="block mb-2 font-semibold text-gray-800">Ghi chú hoặc cảm nhận:</label>
+        <label class="block mb-2 font-semibold text-gray-800">Cảm nhận hoặc ghi chú:</label>
         <textarea v-model="review.content"
           class="w-full rounded-md border border-gray-300 p-3 focus:ring-2 focus:ring-yellow-400" rows="4"
           placeholder="Chia sẻ cảm nhận của bạn về cuốn sách..."></textarea>
       </div>
-      <div>
-        <label class="block mb-2 font-semibold text-gray-800">Chủ đề hoặc thông điệp chính:</label>
-        <input v-model="review.themes" type="text"
-          class="w-full rounded-md border border-gray-300 p-2 focus:ring-2 focus:ring-yellow-400"
-          placeholder="Ví dụ: tình bạn, khám phá, tự do..." />
-      </div>
 
-      <div>
-        <label class="block mb-2 font-semibold text-gray-800">Cảnh báo nội dung (nếu có):</label>
-        <textarea v-model="review.warnings"
-          class="w-full rounded-md border border-gray-300 p-3 focus:ring-2 focus:ring-yellow-400" rows="2"
-          placeholder="Ví dụ: bạo lực, trầm cảm..."></textarea>
-      </div>
-
-      <div class="pt-4 text-right">
+      <div class="pt-4">
         <button @click="submitReview"
           class="px-6 py-2 bg-yellow-400 text-gray-900 rounded-md font-semibold hover:bg-yellow-500 transition-colors">
-          Lưu đánh giá
+          {{ review_data ? "Cập nhật đánh giá" : "Lưu đánh giá" }}
+        </button>
+        <!-- Đường kẻ ngang -->
+        <hr class="my-6 border-gray-300" />
+
+        <!-- Nút xóa bình luận -->
+        <button v-if="review_data" @click="deleteReview"
+          class="px-6 py-2 bg-red-500 text-white rounded-md font-semibold hover:bg-red-600 transition-colors">
+          Xóa đánh giá
         </button>
       </div>
     </div>

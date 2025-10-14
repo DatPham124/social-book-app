@@ -106,11 +106,12 @@ onMounted(() => {
         <div class="flex space-x-4 justify-center">
           <div v-for="item in books.slice(0, 4)" :key="item.book.id"
             class="w-20 h-28 shadow rounded overflow-hidden bg-gray-100 flex">
-            <img v-if="item.book.cover_url" :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`"
-              :alt="item.book.title" class="h-full w-full object-cover" />
-            <span v-else class="text-xs text-gray-500 p-1 text-center">
-              {{ item.book.title }}
-            </span>
+
+            <router-link :to="{ name: 'book', params: { id: item.book.id } }">
+              <img :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`"
+                :alt="item.book.title" class="h-full w-full object-cover" />
+            </router-link>
+
           </div>
         </div>
 

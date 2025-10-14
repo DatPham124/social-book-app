@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { jwtDecode } from "jwt-decode";
 
 export function useAuth() {
+  
   const userInfo = ref<any>(null);
 
   function loadUserFromToken() {

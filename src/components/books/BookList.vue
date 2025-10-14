@@ -7,16 +7,22 @@ import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from "../../config.ts";
 import BookProgress from "../../components/books/BookProgress.vue";
 import BookStatusSelect from "../../components/books/BookStatusSelect.vue";
 
-const { 
-  fetchBook, 
-  fetchBooksByStatus, 
-  formatDate 
+const {
+  fetchBook,
+  fetchBooksByStatus,
+  formatDate
 } = useBooks();
 
-const props = defineProps<{
-  status: "to_read" | "currently_reading" | "read" | "dnf" | "rm_book";
-  title: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    status?: "to_read" | "currently_reading" | "read" | "dnf" | "rm_book";
+    title?: string;
+  }>(),
+  {
+    status: "to_read",
+  }
+);
+
 
 const books = ref<any[]>([]);
 const loading = ref(true);
@@ -101,11 +107,8 @@ onMounted(fetchBooks);
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl font-logo text-yellow-400">{{ props.title }}</h1>
 
-      <router-link
-        v-if="props.status === 'currently_reading'"
-        to="/reading-journal"
-        class="px-4 py-1 rounded-md border bg-white hover:bg-yellow-200 text-sm"
-      >
+      <router-link v-if="props.status === 'currently_reading'" to="/reading-journal"
+        class="px-4 py-1 rounded-md border bg-white hover:bg-yellow-200 text-sm">
         Xem nhật ký
       </router-link>
     </div>
@@ -123,23 +126,23 @@ onMounted(fetchBooks);
     </div>
 
     <div v-else>
-      <div
-        v-for="(book, index) in books"
-        :key="book.id"
-        class="flex border rounded-xl shadow-sm mb-6 bg-white"
-      >
+      <div v-for="(book, index) in books" :key="book.id" class="flex border rounded-xl shadow-sm mb-6 bg-white">
         <!-- Ảnh bìa -->
         <div class="w-32 h-52 flex-shrink-0">
-          <img
-            :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`"
-            :alt="book.title"
-            class="w-full h-full object-cover rounded-l-xl"
-          />
+          <router-link :to="{ name: 'book', params: { id: book.id } }" class="w-32 h-52 flex-shrink-0 block">
+            <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" :alt="book.title"
+              class="w-full h-full object-cover rounded-l-xl cursor-pointer" />
+          </router-link>
         </div>
 
         <div class="flex flex-grow p-4">
           <div class="flex-grow pr-6 border-r border-gray-100 min-w-0">
-            <h3 class="font-bold text-lg mb-0.5 text-gray-800">{{ book.title }}</h3>
+            <router-link
+            :to="{ name: 'book', params: { id: book.id } }"
+            class="font-bold text-lg mb-0.5 text-gray-800 hover:text-yellow-600 transition"
+            >
+            {{ book.title }}
+            </router-link>
             <p class="text-gray-600 text-sm mb-1">{{ book.author }}</p>
             <p class="text-gray-500 text-xs mb-3">
               {{ book.page_count }} trang • {{ book.language }} •
@@ -147,11 +150,8 @@ onMounted(fetchBooks);
             </p>
 
             <div class="flex flex-wrap gap-2 mb-4">
-              <span
-                v-for="category in book.categories"
-                :key="category"
-                class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium"
-              >
+              <span v-for="category in book.categories" :key="category"
+                class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
                 {{ category }}
               </span>
             </div>
@@ -162,33 +162,19 @@ onMounted(fetchBooks);
           </div>
 
           <div class="w-56 pl-6 flex flex-col justify-between items-start flex-shrink-0">
-            <BookProgress
-              v-if="props.status === 'currently_reading'"
-              :book="book"
-              :userId="userInfo.user_id"
-              @update="(updatedBook) => (books[index] = updatedBook)"
-            />
+            <BookProgress v-if="props.status === 'currently_reading'" :book="book" :userId="userInfo.user_id"
+              @update="(updatedBook) => (books[index] = updatedBook)" />
 
-            <BookStatusSelect
-              v-model="book.status"
-              :bookId="book.id"
-              :userId="userInfo.user_id"
-              class="mt-3"
-            />
+            <BookStatusSelect v-model="book.status" :bookId="book.id" :userId="userInfo.user_id" class="mt-3" />
 
             <div class="flex flex-col gap-2 w-full mt-auto">
-              <button
-                @click="updateBookStatus(book.id, { value: 'read' })"
+              <button @click="updateBookStatus(book.id, { value: 'read' })"
                 class="text-sm text-yellow-600 hover:text-yellow-700 font-medium text-left"
-                v-if="props.status === 'currently_reading'"
-              >
+                v-if="props.status === 'currently_reading'">
                 → Đánh dấu "Đã đọc"
               </button>
-              <button
-                @click="updateBookStatus(book.id, { value: 'dnf' })"
-                class="text-sm text-gray-500 hover:text-gray-700 text-left"
-                v-if="props.status === 'currently_reading'"
-              >
+              <button @click="updateBookStatus(book.id, { value: 'dnf' })"
+                class="text-sm text-gray-500 hover:text-gray-700 text-left" v-if="props.status === 'currently_reading'">
                 → Đánh dấu "Chưa hoàn thành"
               </button>
             </div>

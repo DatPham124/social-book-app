@@ -100,17 +100,21 @@ onMounted(() => {
     <div v-else>
       <ul class="divide-y divide-gray-200">
         <li v-for="item in books.slice(0, 3)" :key="item.book.id" class="py-2">
-          <p class="text-gray-800 font-medium truncate">
-            {{ item.book.title }}
-          </p>
-          <p class="text-gray-500 text-sm">
-            {{ item.book.author || "Không rõ tác giả" }}
-          </p>
+          <router-link :to="{ name: 'book', params: { id: item.book.id } }">
+
+            <p class="text-gray-800 font-medium truncate">
+              {{ item.book.title }}
+            </p>
+          </router-link>
+            <p class="text-gray-500 text-sm">
+              {{ item.book.author || "Không rõ tác giả" }}
+            </p>
         </li>
       </ul>
 
       <div class="mt-4 text-center">
-        <router-link :to="{name: 'view_all_to_read_book'}" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm shadow">
+        <router-link :to="{ name: 'view_all_to_read_book' }"
+          class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm shadow">
           View all
         </router-link>
       </div>
