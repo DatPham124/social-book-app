@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel
 from sqlalchemy import Enum, UniqueConstraint
 from sqlmodel import SQLModel, Field
@@ -55,3 +55,20 @@ class Friends(SQLModel, table=True):
     friend_id: int = Field(foreign_key="user.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     status: str = Field(default=FriendRequest.pending)  # pending, accepted, rejected
+
+
+class NotificationStatus(str, Enum):
+    UNREAD = "unread"
+    READ = "read"
+
+
+class Notification(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    receiver_id: int = Field(foreign_key="user.id")
+    sender_id: int = Field(foreign_key="user.id")
+    type: str = Field(default="friend_request", description="Loại thông báo: friend_request, bookclub_invite,...")
+    message: str
+    status: str = Field(default="unread")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    read_at: Optional[datetime] = None
+    is_deleted: bool = Field(default=False)

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import users, admin, profiles, friend
+from .routes import users, admin, profiles, friend, notification
 from common_lib.database import engine_user_srevice
 from sqlmodel import SQLModel, Session, select
 from .model import Role
@@ -36,3 +36,5 @@ app.include_router(users.router)
 app.include_router(profiles.router)
 app.include_router(admin.router)
 app.include_router(friend.router)
+app.include_router(notification.router)
+

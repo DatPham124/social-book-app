@@ -6,16 +6,17 @@ from ..auth import get_current_active_user
 
 router = APIRouter(
     prefix="/friends",
-    tags=["friends"],
-    dependencies=[Depends(get_current_active_user)]
+    tags=["friends"]
 )
 
+
 @router.post("/add", response_model=Friends)
-def add_friend(friend: Friends, friend_id: int, session: Session = Depends(get_session_user_service), current_user: User = Depends(get_current_active_user)):
-    
+def add_friend(
+    friend_id: int,
+    session: Session = Depends(get_session_user_service),
+    current_user: User = Depends(get_current_active_user)
+):
     user_id = current_user.id
-    friend.user_id = user_id
-    friend.friend_id = friend_id    
 
     if user_id == friend_id:
         raise HTTPException(
@@ -23,11 +24,22 @@ def add_friend(friend: Friends, friend_id: int, session: Session = Depends(get_s
             detail="You cannot add yourself as a friend"
         )
 
-    session.add(friend)
-    session.commit()
-    session.refresh(friend) 
+    existing = session.query(Friends).filter_by(
+        user_id=user_id, friend_id=friend_id
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Friend already added"
+        )
 
-    return friend
+    new_friend = Friends(user_id=user_id, friend_id=friend_id)
+
+    session.add(new_friend)
+    session.commit()
+    session.refresh(new_friend)
+
+    return new_friend
 
 @router.get("/{user_id}/{status}", response_model=list[Friends])
 def get_all_friends_by_userID_and_status(status: str, session: Session = Depends(get_session_user_service), current_user: User = Depends(get_current_active_user)):

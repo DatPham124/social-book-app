@@ -13,9 +13,7 @@ load_dotenv()
 FILE_SERVER_API = os.getenv("FILE_SERVER_API")
 router = APIRouter(
     prefix="/users",
-    tags=["profiles"],
-    dependencies=[Depends(auth.get_current_active_user)]
-)
+    tags=["profiles"])
 
 @router.post("/profile/add")
 def create_profile(
