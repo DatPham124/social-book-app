@@ -115,7 +115,7 @@ onMounted(() => {
       <div class="mt-4 text-center">
         <router-link :to="{ name: 'view_all_to_read_book' }"
           class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm shadow">
-          View all
+          Xem tất cả
         </router-link>
       </div>
     </div>
