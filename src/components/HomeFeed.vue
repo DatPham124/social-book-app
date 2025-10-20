@@ -105,7 +105,6 @@ async function loadMoreBooks() {
         ]);
 
         const authorName = authorResponse ? authorResponse.name : "Không rõ";
-        // Xử lý nhiều categories
         const categoryNames = categoriesResponse && categoriesResponse.length > 0 
           ? categoriesResponse.map((cat: any) => cat.name).join(', ')
           : "Không rõ";
@@ -113,7 +112,7 @@ async function loadMoreBooks() {
         return {
           ...book,
           authorName,
-          categoryName: categoryNames, // Giữ tên cũ để tương thích
+          categoryName: categoryNames,
           status: { value: "to_read", label: "Sẽ đọc" }
         };
       })
@@ -142,12 +141,10 @@ onMounted(() => {
     <ul v-else-if="books.length > 0">
       <li v-for="book in books" :key="book.id">
         <div class="flex flex-row relative h-60 w-full bg-white rounded-lg shadow-md m-2">
-          <!-- Ảnh bìa -->
           <div class="relative h-full w-40 flex-shrink-0">
             <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" alt="Book Cover" class="h-full object-contain" />
           </div>
 
-          <!-- Thông tin sách -->
           <div class="m-4 flex-grow">
             <p class="font-bold text-2xl">{{ book.title }}</p>
             <p class="text-gray-600 mt-2">Tác giả: {{ book.authorName }}</p>
@@ -156,7 +153,6 @@ onMounted(() => {
             <p class="text-gray-600 mt-2">Mô tả: {{ book.description }}</p>
           </div>
 
-          <!-- Dropdown chọn trạng thái -->
           <div class="p-4 flex items-start justify-end">
             <Listbox v-model="book.status" @update:modelValue="(val) => updateBookStatus(book.id, val)">
               <div class="relative w-48">

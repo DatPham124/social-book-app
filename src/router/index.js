@@ -15,6 +15,8 @@ import DetailReview from "../components/books/DetailReview.vue";
 
 import Notification from "../views/Notification.vue";
 
+import CommunityTab from "../views/CommunityTab.vue";
+
 const routes = [
   { path: "/login", name: "Login", component: Login },
   { path: "/home", name: "Home", component: Home },
@@ -52,6 +54,12 @@ const routes = [
     path: "/notifications",
     name: "Notification",
     component: Notification,
+  },
+
+  {
+    path: "/community",
+    name: "CommunityTab",
+    component: CommunityTab,
   },
 
 
