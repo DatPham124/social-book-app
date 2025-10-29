@@ -70,7 +70,7 @@ class BookClub(SQLModel, table=True):
     creator_id: int = Field(index=True, nullable=False)
     is_public: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    avatar_url: Optional[str] = None  # Ảnh đại diện cho club
+    avatar_url: Optional[str] = None 
 
     members: List["BookClubMember"] = Relationship(back_populates="club")
     books: List["BookClubBook"] = Relationship(back_populates="club")
@@ -122,3 +122,10 @@ class BookClubComment(SQLModel, table=True):
 
     discussion: Optional[BookClubDiscussion] = Relationship(back_populates="comments")
 
+class BookClubMeeting(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    club_id: int = Field(foreign_key="bookclub.id", nullable=False)
+    title: str = Field(nullable=False)
+    date: datetime = Field(nullable=False)
+    status: str = Field(default="upcoming")  # upcoming, past
+    created_at: datetime = Field(default_factory=datetime.utcnow)

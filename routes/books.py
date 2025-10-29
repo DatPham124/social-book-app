@@ -9,6 +9,26 @@ router = APIRouter(
     tags=["books"],
 )
 
+@router.get("/search", response_model=list[Books])
+def search_books(
+    q: str = Query(..., min_length=1, description="Từ khóa tìm kiếm theo tiêu đề sách"),
+    limit: int = Query(10, ge=1, le=50),
+    session: Session = Depends(get_session_book_service)
+):
+    query = (
+        select(Books)
+        .where(
+            (Books.title.ilike(f"%{q}%"))
+        )
+        .limit(limit)
+    )
+    results = session.exec(query).all()
+    
+    if not results:
+        return []
+    
+    return results
+
 @router.post('/add', response_model=Books)
 def add_book(book: Books, session: Session = Depends(get_session_book_service)):
     session.add(book)

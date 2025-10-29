@@ -1,182 +1,249 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
 from sqlmodel import Session, select
-from typing import List
 from datetime import datetime
+from typing import List
+import requests, os
+from dotenv import load_dotenv
 
 from ..model import (
-    BookClub, BookClubMember, BookClubBook,
-    BookClubDiscussion, BookClubComment
+    BookClub,
+    BookClubMeeting,
+    BookClubMember,
+    BookClubBook,
+    BookClubDiscussion,
+    BookClubComment,
 )
 from common_lib.database import get_session_book_service
 
-router = APIRouter(prefix="/bookclub", tags=["BookClub"])
+load_dotenv()
+router = APIRouter(prefix="/bookclubs", tags=["bookclubs"])
+
+FILE_SERVER_API = os.getenv("FILE_SERVER_API")
 
 
-@router.post("/create", response_model=BookClub)
+
+@router.post("/create")
 def create_bookclub(
-    name: str,
-    creator_id: int,
-    description: str = "",
-    is_public: bool = True,
-    session: Session = Depends(get_session_book_service)
+    name: str = Form(...),
+    creator_id: int = Form(...),
+    description: str = Form(""),
+    file: UploadFile = File(None),
+    session: Session = Depends(get_session_book_service),
 ):
-    new_club = BookClub(
+    club = BookClub(
         name=name,
         description=description,
         creator_id=creator_id,
-        is_public=is_public,
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
-    session.add(new_club)
+    session.add(club)
     session.commit()
-    session.refresh(new_club)
+    session.refresh(club)
+
+    if file:
+        try:
+            files = {"file": (file.filename, file.file, file.content_type)}
+
+            res = requests.post(f"{FILE_SERVER_API}/upload/club", files=files)
+            res.raise_for_status()
+
+            upload_data = res.json()
+            club.avatar_url = upload_data.get("filename", "")
+
+            session.add(club)
+            session.commit()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Lỗi upload ảnh: {e}")
 
     member = BookClubMember(
-        club_id=new_club.id,
+        club_id=club.id,
         user_id=creator_id,
         role="host",
-        joined_at=datetime.utcnow()
+        joined_at=datetime.utcnow(),
     )
     session.add(member)
     session.commit()
 
-    return new_club
+    return {"message": "Tạo câu lạc bộ thành công", "club": club}
 
 
-@router.get("/", response_model=List[BookClub])
+@router.get("/")
 def list_bookclubs(session: Session = Depends(get_session_book_service)):
     return session.exec(select(BookClub)).all()
 
+@router.get("/created_by/{user_id}")
+def get_created_bookclubs(
+    user_id: int, session: Session = Depends(get_session_book_service)
+):
+    clubs = session.exec(
+        select(BookClub).where(BookClub.creator_id == user_id)
+    ).all()
+    return clubs
 
-@router.get("/{club_id}", response_model=BookClub)
+
+@router.get("/joined_by/{user_id}")
+def get_joined_bookclubs(
+    user_id: int, session: Session = Depends(get_session_book_service)
+):
+    stmt = (
+        select(BookClub)
+        .join(BookClubMember, BookClubMember.club_id == BookClub.id)
+        .where(BookClubMember.user_id == user_id)
+    )
+    clubs = session.exec(stmt).all()
+    return clubs
+
+
+
+@router.get("/{club_id}")
 def get_bookclub(club_id: int, session: Session = Depends(get_session_book_service)):
     club = session.get(BookClub, club_id)
     if not club:
-        raise HTTPException(status_code=404, detail="Câu lạc bộ không tồn tại")
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
     return club
 
 
-@router.post("/{club_id}/join")
-def join_bookclub(
-    club_id: int,
-    user_id: int,
-    session: Session = Depends(get_session_book_service)
-):
+@router.delete("/{club_id}")
+def delete_bookclub(club_id: int, session: Session = Depends(get_session_book_service)):
     club = session.get(BookClub, club_id)
     if not club:
         raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
 
+    # Nếu có ảnh thì xóa khỏi file server
+    if club.avatar_url:
+        try:
+            filename = os.path.basename(club.avatar_url)
+            requests.delete(f"{FILE_SERVER_API}/upload/club/{filename}")
+        except Exception:
+            pass
+
+    session.delete(club)
+    session.commit()
+    return {"message": "Đã xóa câu lạc bộ"}
+
+
+@router.post("/{club_id}/join")
+def join_bookclub(club_id: int, user_id: int, session: Session = Depends(get_session_book_service)):
     existing = session.exec(
-        select(BookClubMember)
-        .where(BookClubMember.club_id == club_id, BookClubMember.user_id == user_id)
+        select(BookClubMember).where(
+            BookClubMember.club_id == club_id, BookClubMember.user_id == user_id
+        )
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Bạn đã tham gia câu lạc bộ này")
-
-    new_member = BookClubMember(
-        club_id=club_id,
-        user_id=user_id,
-        joined_at=datetime.utcnow()
-    )
-    session.add(new_member)
+        raise HTTPException(status_code=400, detail="Đã tham gia")
+    member = BookClubMember(club_id=club_id, user_id=user_id, joined_at=datetime.utcnow())
+    session.add(member)
     session.commit()
-    return {"message": "Đã tham gia câu lạc bộ thành công"}
+    return {"message": "Tham gia thành công"}
+
+
+@router.delete("/{club_id}/leave")
+def leave_bookclub(club_id: int, user_id: int, session: Session = Depends(get_session_book_service)):
+    member = session.exec(
+        select(BookClubMember).where(
+            BookClubMember.club_id == club_id, BookClubMember.user_id == user_id
+        )
+    ).first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Chưa tham gia")
+    session.delete(member)
+    session.commit()
+    return {"message": "Đã rời câu lạc bộ"}
 
 
 @router.post("/{club_id}/add_book")
-def add_book_to_club(
-    club_id: int,
-    book_id: int,
-    user_id: int,
-    session: Session = Depends(get_session_book_service)
-):
-    club = session.get(BookClub, club_id)
-    if not club:
-        raise HTTPException(status_code=404, detail="Câu lạc bộ không tồn tại")
-
-    if club.creator_id != user_id:
-        raise HTTPException(status_code=403, detail="Chỉ chủ câu lạc bộ mới được thêm sách")
-
-    existing = session.exec(
-        select(BookClubBook).where(BookClubBook.club_id == club_id, BookClubBook.book_id == book_id)
-    ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Sách đã tồn tại trong câu lạc bộ")
-
+def add_book(club_id: int, book_id: int, session: Session = Depends(get_session_book_service)):
     club_book = BookClubBook(club_id=club_id, book_id=book_id, status="reading")
     session.add(club_book)
     session.commit()
-    return {"message": "Đã thêm sách vào câu lạc bộ"}
+    return {"message": "Đã thêm sách"}
 
 
-@router.post("/{club_id}/discussion", response_model=BookClubDiscussion)
+@router.post("/{club_id}/discussion")
 def create_discussion(
     club_id: int,
     user_id: int,
     title: str,
     content: str,
-    session: Session = Depends(get_session_book_service)
+    session: Session = Depends(get_session_book_service),
 ):
-    club = session.get(BookClub, club_id)
-    if not club:
-        raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
-
-    new_discussion = BookClubDiscussion(
+    discussion = BookClubDiscussion(
         club_id=club_id,
         user_id=user_id,
         title=title,
         content=content,
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
-    session.add(new_discussion)
+    session.add(discussion)
     session.commit()
-    session.refresh(new_discussion)
-    return new_discussion
+    session.refresh(discussion)
+    return discussion
 
 
-@router.post("/discussion/{discussion_id}/comment", response_model=BookClubComment)
-def comment_discussion(
+@router.post("/discussion/{discussion_id}/comment")
+def add_comment(
     discussion_id: int,
     user_id: int,
     content: str,
-    session: Session = Depends(get_session_book_service)
+    session: Session = Depends(get_session_book_service),
 ):
-    discussion = session.get(BookClubDiscussion, discussion_id)
-    if not discussion:
-        raise HTTPException(status_code=404, detail="Bài thảo luận không tồn tại")
-
-    new_comment = BookClubComment(
+    comment = BookClubComment(
         discussion_id=discussion_id,
         user_id=user_id,
         content=content,
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
     )
-    session.add(new_comment)
+    session.add(comment)
     session.commit()
-    session.refresh(new_comment)
-    return new_comment
+    session.refresh(comment)
+    return comment
 
 
-@router.get("/{club_id}/discussions", response_model=List[BookClubDiscussion])
+@router.get("/{club_id}/discussions")
 def list_discussions(club_id: int, session: Session = Depends(get_session_book_service)):
     return session.exec(
         select(BookClubDiscussion).where(BookClubDiscussion.club_id == club_id)
     ).all()
 
-
-@router.delete("/{club_id}/leave")
-def leave_bookclub(
+@router.post("/{club_id}/upload_image")
+def upload_club_image(
     club_id: int,
-    user_id: int,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session_book_service),
+):
+    club = session.get(BookClub, club_id)
+    if not club:
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
+
+    try:
+        files = {"file": (file.filename, file.file, file.content_type)}
+        res = requests.post(f"{FILE_SERVER_API}/upload/club", files=files)
+        res.raise_for_status()
+        data = res.json()
+        club.avatar_url = data.get("url")
+
+        session.add(club)
+        session.commit()
+        session.refresh(club)
+
+        return {"message": "Tải ảnh thành công", "avatar_url": club.avatar_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi upload ảnh: {e}")
+
+@router.get("/{club_id}/meetings")
+def list_meetings(club_id: int, session: Session = Depends(get_session_book_service)):
+    return session.exec(
+        select(BookClubMeeting).where(BookClubMeeting.club_id == club_id)
+    ).all()
+
+@router.post("/{club_id}/meetings")
+def create_meeting(
+    club_id: int,
+    title: str = Form(...),
+    date: datetime = Form(...),
     session: Session = Depends(get_session_book_service)
 ):
-    member = session.exec(
-        select(BookClubMember)
-        .where(BookClubMember.club_id == club_id, BookClubMember.user_id == user_id)
-    ).first()
-    if not member:
-        raise HTTPException(status_code=404, detail="Bạn chưa tham gia câu lạc bộ này")
-
-    session.delete(member)
+    meeting = BookClubMeeting(club_id=club_id, title=title, date=date)
+    session.add(meeting)
     session.commit()
-    return {"message": "Đã rời câu lạc bộ"}
+    return meeting
