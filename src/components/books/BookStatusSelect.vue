@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref } from "vue";
 import axios from "axios";
 import { BOOK_SERVICE_URL } from "../../config.ts";
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/vue";

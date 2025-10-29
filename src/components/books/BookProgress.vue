@@ -8,7 +8,7 @@ const props = defineProps<{
   userId: number;
 }>();
 
-const emit = defineEmits(["update"]); // phát sự kiện khi lưu thành công
+const emit = defineEmits(["update"]);
 const isSaving = ref(false);
 
 async function updateReadingProgress(newPage: number) {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import Navbar from '../components/layout/Navbar.vue'
-import BookClub from '../components/Community/BookClub.vue'
+import BookClub from '../components/community/BookClub/BookClub.vue'
 
 // Danh sách các tab tiếng Việt
 const tabs = [

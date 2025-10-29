@@ -16,7 +16,7 @@ import DetailReview from "../components/books/DetailReview.vue";
 import Notification from "../views/Notification.vue";
 
 import CommunityTab from "../views/CommunityTab.vue";
-
+import BookClubCard from "../components/community/BookClub/BookClubCard.vue";
 const routes = [
   { path: "/login", name: "Login", component: Login },
   { path: "/home", name: "Home", component: Home },
@@ -62,6 +62,12 @@ const routes = [
     component: CommunityTab,
   },
 
+  {
+    path: "/bookclub/:id",
+    name: "BookClubCard",
+    component: BookClubCard,
+    props: true,
+  },
 
   { path: "/", redirect: "/login" },
 ];
