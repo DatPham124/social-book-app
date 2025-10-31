@@ -10,7 +10,7 @@ app = FastAPI()
 def on_startup():
     
     # with engine_book_service.begin() as conn:
-    #     for table_name in ["bookclubcomment", "bookclubdiscussion", "bookclubbook", "bookclubmember", "bookclub"]:
+    #     for table_name in ["bookclubcomment", "bookclubdiscussion", "bookclubbook", "bookclubmember", "bookclub", "bookclubmeeting"]:
     #         try:
     #             table = Table(table_name, SQLModel.metadata, autoload_with=engine_book_service)
     #             table.drop(engine_book_service)

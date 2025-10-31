@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
 from sqlmodel import Session, select
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 import requests, os
 from dotenv import load_dotenv
 
@@ -101,6 +101,49 @@ def get_bookclub(club_id: int, session: Session = Depends(get_session_book_servi
     if not club:
         raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
     return club
+
+
+@router.put("/{club_id}")
+def update_bookclub(
+    club_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    rules: str = Form(""),  
+    file: UploadFile = File(None),
+    session: Session = Depends(get_session_book_service),
+):
+    club = session.get(BookClub, club_id)
+    if not club:
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
+
+    club.name = name
+    club.description = description
+    club.rules = rules
+
+    if file:
+        if club.avatar_url:
+            try:
+                requests.delete(f"{FILE_SERVER_API}/upload/club/{club.avatar_url}")
+            except Exception as e:
+                print(f"Lỗi khi xóa ảnh cũ: {e}")
+
+        try:
+            files = {"file": (file.filename, file.file, file.content_type)}
+            res = requests.post(f"{FILE_SERVER_API}/upload/club", files=files)
+            res.raise_for_status()
+
+            upload_data = res.json()
+            club.avatar_url = upload_data.get("filename", "") 
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Lỗi upload ảnh mới: {e}")
+
+    session.add(club)
+    session.commit()
+    session.refresh(club)
+
+    return {"message": "Cập nhật câu lạc bộ thành công", "club": club}
+
+
 
 
 @router.delete("/{club_id}")
@@ -241,9 +284,58 @@ def create_meeting(
     club_id: int,
     title: str = Form(...),
     date: datetime = Form(...),
+    book_id: Optional[int] = Form(None),
     session: Session = Depends(get_session_book_service)
 ):
-    meeting = BookClubMeeting(club_id=club_id, title=title, date=date)
+    meeting = BookClubMeeting(club_id=club_id, title=title, date=date, book_id=book_id)
     session.add(meeting)
     session.commit()
+    session.refresh(meeting) 
+    return meeting
+
+
+
+from pydantic import BaseModel
+class MeetingDetailsResponse(BookClubMeeting):
+    creator_id: int | None = None
+
+@router.get("/meeting/{meeting_id}", response_model=MeetingDetailsResponse)
+def get_meeting_details(
+    meeting_id: int, 
+    session: Session = Depends(get_session_book_service)
+):
+    statement = (
+        select(BookClubMeeting, BookClub.creator_id)
+        .join(BookClub, BookClubMeeting.club_id == BookClub.id)
+        .where(BookClubMeeting.id == meeting_id)
+    )
+    
+    result = session.exec(statement).first()
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Không tìm thấy cuộc họp")
+
+    meeting, creator_id = result
+    
+    response_data = meeting.dict()
+    response_data["creator_id"] = creator_id
+    
+    
+    return response_data
+
+
+@router.put("/meeting/{meeting_id}/agenda")
+def update_meeting_agenda(
+    meeting_id: int,
+    agenda: str = Form(""),
+    session: Session = Depends(get_session_book_service)
+):
+    meeting = session.get(BookClubMeeting, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Không tìm thấy cuộc họp")
+
+    meeting.agenda = agenda
+    session.add(meeting)
+    session.commit()
+    session.refresh(meeting)
     return meeting

@@ -65,67 +65,59 @@ class ReadingProgress(SQLModel, table=True):
     
 class BookClub(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True, nullable=False)
-    description: Optional[str] = Field(default=None)
-    creator_id: int = Field(index=True, nullable=False)
+    name: str
+    description: Optional[str] = None
+    rules: Optional[str] = None
+    creator_id: int = Field(index=True)
     is_public: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    avatar_url: Optional[str] = None 
+    avatar_url: Optional[str] = None
 
-    members: List["BookClubMember"] = Relationship(back_populates="club")
-    books: List["BookClubBook"] = Relationship(back_populates="club")
-    discussions: List["BookClubDiscussion"] = Relationship(back_populates="club")
 
 class BookClubMember(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    club_id: int = Field(foreign_key="bookclub.id", nullable=False)
-    user_id: int = Field(index=True, nullable=False)
-    role: str = Field(default="member")  # "host", "member"
+    club_id: int = Field(index=True)
+    user_id: int = Field(index=True)
+    role: str = Field(default="member")
     joined_at: datetime = Field(default_factory=datetime.utcnow)
 
-    club: Optional[BookClub] = Relationship(back_populates="members")
-
-    __table_args__ = (
-        UniqueConstraint("club_id", "user_id", name="uix_club_user"),
-    )
 
 class BookClubBook(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    club_id: int = Field(foreign_key="bookclub.id", nullable=False)
-    book_id: int = Field(foreign_key="books.id", nullable=False)
-    status: str = Field(default="reading")  # "reading", "finished", "suggested"
+    club_id: int = Field(index=True)
+    book_id: int = Field(index=True)
+    status: str = Field(default="reading")
     added_at: datetime = Field(default_factory=datetime.utcnow)
 
-    club: Optional[BookClub] = Relationship(back_populates="books")
-
-    __table_args__ = (
-        UniqueConstraint("club_id", "book_id", name="uix_club_book"),
-    )
 
 class BookClubDiscussion(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    club_id: int = Field(foreign_key="bookclub.id", nullable=False)
-    user_id: int = Field(index=True, nullable=False)
-    title: str = Field(nullable=False)
-    content: str = Field(nullable=False)
+    club_id: int = Field(index=True)
+    user_id: int = Field(index=True)
+    title: str
+    content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    club: Optional[BookClub] = Relationship(back_populates="discussions")
-    comments: List["BookClubComment"] = Relationship(back_populates="discussion")
 
 class BookClubComment(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    discussion_id: int = Field(foreign_key="bookclubdiscussion.id", nullable=False)
-    user_id: int = Field(index=True, nullable=False)
-    content: str = Field(nullable=False)
+    
+    discussion_id: Optional[int] = Field(default=None, index=True) 
+    meeting_id: Optional[int] = Field(default=None, index=True) 
+    
+    user_id: int = Field(index=True)
+    content: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    discussion: Optional[BookClubDiscussion] = Relationship(back_populates="comments")
 
 class BookClubMeeting(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    club_id: int = Field(foreign_key="bookclub.id", nullable=False)
-    title: str = Field(nullable=False)
-    date: datetime = Field(nullable=False)
-    status: str = Field(default="upcoming")  # upcoming, past
+    club_id: int = Field(index=True)
+    book_id: Optional[int] = Field(default=None, index=True) 
+
+    title: str
+    date: datetime
+    location: Optional[str] = Field(default=None) 
+    agenda: Optional[str] = Field(default=None)  
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
