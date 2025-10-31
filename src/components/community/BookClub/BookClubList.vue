@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue"
 import axios from "axios"
-import BookClubCreate from "../BookClub/BookClubCreate.vue"
 import { BOOK_SERVICE_URL, BOOKCLUB_IMAGE_SERVER_URL } from "../../../config"
 import { useAuth } from "../../../composables/useAuth"
 import { getProfile } from "../../../composables/useProfile"
@@ -97,8 +96,13 @@ onMounted(loadClubs)
                     <p class="text-sm text-gray-500">Người tạo: {{ club.creator_name }}</p>
                     <p class="text-sm text-gray-500">
                         Ngày tạo:
-                        {{ new Date(club.created_at).toLocaleDateString() }}
+                        {{ new Date(club.created_at).toLocaleDateString("vi-VN") }}
+                        -
+                        {{ new Date(club.created_at).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })
+                        }}
                     </p>
+
+
                 </div>
             </div>
         </div>
