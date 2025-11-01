@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 from datetime import datetime
 from typing import List, Optional
 import requests, os
@@ -7,11 +7,13 @@ from dotenv import load_dotenv
 
 from ..model import (
     BookClub,
+    BookClubInvitation,
     BookClubMeeting,
     BookClubMember,
     BookClubBook,
     BookClubDiscussion,
     BookClubComment,
+    InviteStatus,
 )
 from common_lib.database import get_session_book_service
 
@@ -110,11 +112,15 @@ def update_bookclub(
     description: str = Form(""),
     rules: str = Form(""),  
     file: UploadFile = File(None),
+    user_id: int = Form(...),
     session: Session = Depends(get_session_book_service),
 ):
     club = session.get(BookClub, club_id)
     if not club:
         raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
+    
+    if club.creator_id != user_id:
+        raise HTTPException(status_code=403, detail="Chỉ người tạo club mới có quyền này")
 
     club.name = name
     club.description = description
@@ -147,18 +153,20 @@ def update_bookclub(
 
 
 @router.delete("/{club_id}")
-def delete_bookclub(club_id: int, session: Session = Depends(get_session_book_service)):
+def delete_bookclub(club_id: int, session: Session = Depends(get_session_book_service), user_id: int = Form(...)):
     club = session.get(BookClub, club_id)
     if not club:
         raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
-
-    # Nếu có ảnh thì xóa khỏi file server
+    if club.creator_id != user_id:
+        raise HTTPException(status_code=403, detail="Chỉ người tạo club mới có quyền này")
     if club.avatar_url:
         try:
             filename = os.path.basename(club.avatar_url)
             requests.delete(f"{FILE_SERVER_API}/upload/club/{filename}")
         except Exception:
             pass
+        
+    
 
     session.delete(club)
     session.commit()
@@ -166,15 +174,30 @@ def delete_bookclub(club_id: int, session: Session = Depends(get_session_book_se
 
 
 @router.post("/{club_id}/join")
-def join_bookclub(club_id: int, user_id: int, session: Session = Depends(get_session_book_service)):
+def join_bookclub(
+    club_id: int, 
+    user_id: int = Form(...), 
+    session: Session = Depends(get_session_book_service)
+):
+    club = session.get(BookClub, club_id)
+    if not club:
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
+        
     existing = session.exec(
         select(BookClubMember).where(
-            BookClubMember.club_id == club_id, BookClubMember.user_id == user_id
+            BookClubMember.club_id == club_id, 
+            BookClubMember.user_id == user_id
         )
     ).first()
+    
     if existing:
         raise HTTPException(status_code=400, detail="Đã tham gia")
-    member = BookClubMember(club_id=club_id, user_id=user_id, joined_at=datetime.utcnow())
+        
+    member = BookClubMember(
+        club_id=club_id, 
+        user_id=user_id, 
+        joined_at=datetime.utcnow()
+    )
     session.add(member)
     session.commit()
     return {"message": "Tham gia thành công"}
@@ -285,8 +308,15 @@ def create_meeting(
     title: str = Form(...),
     date: datetime = Form(...),
     book_id: Optional[int] = Form(None),
+    user_id: int = Form(...), # <-- 1. NHẬN user_id
     session: Session = Depends(get_session_book_service)
 ):
+    club = session.get(BookClub, club_id)
+    if not club:
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
+    if club.creator_id != user_id:
+        raise HTTPException(status_code=403, detail="Chỉ người tạo club mới có quyền này")
+
     meeting = BookClubMeeting(club_id=club_id, title=title, date=date, book_id=book_id)
     session.add(meeting)
     session.commit()
@@ -328,14 +358,153 @@ def get_meeting_details(
 def update_meeting_agenda(
     meeting_id: int,
     agenda: str = Form(""),
+    user_id: int = Form(...), 
     session: Session = Depends(get_session_book_service)
 ):
-    meeting = session.get(BookClubMeeting, meeting_id)
-    if not meeting:
+    statement = (
+        select(BookClubMeeting, BookClub.creator_id)
+        .join(BookClub, BookClubMeeting.club_id == BookClub.id)
+        .where(BookClubMeeting.id == meeting_id)
+    )
+    result = session.exec(statement).first()
+    if not result:
         raise HTTPException(status_code=404, detail="Không tìm thấy cuộc họp")
+    
+    meeting, creator_id = result
+    
+    if creator_id != user_id:
+        raise HTTPException(status_code=403, detail="Chỉ người tạo club mới có quyền này")
 
     meeting.agenda = agenda
     session.add(meeting)
     session.commit()
     session.refresh(meeting)
     return meeting
+
+
+
+@router.post("/{club_id}/invite")
+def invite_to_bookclub(
+    club_id: int,
+    creator_id: int = Form(...), 
+    invitee_id: int = Form(...), 
+    session: Session = Depends(get_session_book_service),
+):
+    club = session.get(BookClub, club_id)
+    if not club:
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
+
+    if club.creator_id != creator_id:
+        raise HTTPException(status_code=403, detail="Chỉ người tạo club mới có quyền mời")
+
+    existing_member = session.exec(
+        select(BookClubMember).where(
+            BookClubMember.club_id == club_id, 
+            BookClubMember.user_id == invitee_id
+        )
+    ).first()
+    if existing_member:
+        raise HTTPException(status_code=400, detail="Người dùng này đã ở trong câu lạc bộ")
+
+    existing_invite = session.exec(
+        select(BookClubInvitation).where(
+            BookClubInvitation.club_id == club_id,
+            BookClubInvitation.receiver_id == invitee_id,
+            BookClubInvitation.status == InviteStatus.PENDING
+        )
+    ).first()
+    if existing_invite:
+        raise HTTPException(status_code=400, detail="Đã gửi lời mời đến người này")
+
+    invitation = BookClubInvitation(
+        club_id=club_id,
+        sender_id=creator_id,
+        receiver_id=invitee_id,
+        status=InviteStatus.PENDING
+    )
+    
+    session.add(invitation)
+    session.commit()
+
+    return {"message": "Đã gửi lời mời thành công"}
+
+@router.get("/invitations/{user_id}", response_model=List[BookClubInvitation])
+def get_my_invitations(
+    user_id: int,
+    session: Session = Depends(get_session_book_service)
+):
+
+    invitations = session.exec(
+        select(BookClubInvitation).where(
+            BookClubInvitation.receiver_id == user_id,
+            BookClubInvitation.status == InviteStatus.PENDING
+        )
+    ).all()
+    return invitations
+
+
+@router.post("/invitations/{invitation_id}/accept")
+def accept_invitation(
+    invitation_id: int,
+    session: Session = Depends(get_session_book_service)
+):
+
+    invitation = session.get(BookClubInvitation, invitation_id)
+    if not invitation or invitation.status != InviteStatus.PENDING:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lời mời")
+
+    member = BookClubMember(
+        club_id=invitation.club_id,
+        user_id=invitation.receiver_id,
+        joined_at=datetime.utcnow()
+    )
+    session.add(member)
+    
+    invitation.status = InviteStatus.ACCEPTED
+    session.add(invitation)
+    
+    session.commit()
+    
+    return {"message": "Đã chấp nhận lời mời và tham gia câu lạc bộ"}
+
+
+@router.delete("/invitations/{invitation_id}/decline")
+def decline_invitation(
+    invitation_id: int,
+    session: Session = Depends(get_session_book_service)
+):
+
+    invitation = session.get(BookClubInvitation, invitation_id)
+    if not invitation or invitation.status != InviteStatus.PENDING:
+        raise HTTPException(status_code=404, detail="Không tìm thấy lời mời")
+
+    invitation.status = InviteStatus.DECLINED
+    
+    session.add(invitation)
+    session.commit()
+    
+    return {"message": "Đã từ chối lời mời"}
+
+
+@router.get("/{club_id}/member-count")
+def get_member_count(
+    club_id: int, 
+    session: Session = Depends(get_session_book_service)
+):
+    statement = select(func.count(BookClubMember.id)).where(BookClubMember.club_id == club_id)
+    count = session.exec(statement).one()
+    return {"club_id": club_id, "member_count": count}
+
+
+@router.get("/{club_id}/members")
+def get_club_members(
+    club_id: int, 
+    session: Session = Depends(get_session_book_service)
+):
+
+    
+    statement = select(BookClubMember).where(BookClubMember.club_id == club_id)
+    members = session.exec(statement).all()
+    
+
+    return members

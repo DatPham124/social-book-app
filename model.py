@@ -121,3 +121,21 @@ class BookClubMeeting(SQLModel, table=True):
     agenda: Optional[str] = Field(default=None)  
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+class InviteStatus(str, Enum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+
+class BookClubInvitation(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    club_id: int = Field(index=True, foreign_key="bookclub.id")
+    sender_id: int = Field(index=True) 
+    receiver_id: int = Field(index=True) 
+    
+    status: InviteStatus = Field(
+        default=InviteStatus.PENDING, 
+        sa_column=Column(SqlEnum(InviteStatus))
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
