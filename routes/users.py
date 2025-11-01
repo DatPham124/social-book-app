@@ -1,12 +1,12 @@
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from jwt import PyJWTError
-from sqlmodel import Session
+from sqlmodel import Session, select
 from common_lib.database import get_session_user_service
-from ..model import Role, User, Password_Update, User_role, UserCreate
+from ..model import Role, User, Password_Update, User_role, UserCreate, UserPublic
 from .. import auth
 from dotenv import load_dotenv
 import os
@@ -67,6 +67,25 @@ def register(user: UserCreate, session: Session = Depends(get_session_user_servi
 
     return new_user
 
+
+@router.get("/search", response_model=List[UserPublic])
+def search_users(
+    query: str, 
+    session: Session = Depends(get_session_user_service)
+):
+
+    if not query:
+        return []
+        
+    search_term = f"%{query.lower()}%"
+    
+    users = session.exec(
+        select(User)
+        .where(User.username.ilike(search_term))
+        .limit(10)
+    ).all()
+    
+    return users
 
 @router.post("/token")
 async def login_for_access_token(

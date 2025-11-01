@@ -5,6 +5,10 @@ from sqlalchemy import Enum, UniqueConstraint
 from sqlmodel import SQLModel, Field
 
 
+class UserPublic(SQLModel):
+    id: int
+    username: str
+
 class User(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True, index=True)  
     email: str = Field(index=True, unique=True, nullable =False)
