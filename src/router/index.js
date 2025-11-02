@@ -18,6 +18,9 @@ import Notification from "../views/Notification.vue";
 import CommunityTab from "../views/CommunityTab.vue";
 import BookClubCard from "../components/community/BookClub/BookClubCard.vue";
 import MettingDetail from '../components/community/BookClub/MettingDetail.vue';
+
+import DiscussionDetail from "../components/community/BookClub/DiscussionDetail.vue";
+
 const routes = [
   { path: "/login", name: "Login", component: Login },
   { path: "/home", name: "Home", component: Home },
@@ -74,6 +77,13 @@ const routes = [
     name: 'MeetingDetail',
     component: MettingDetail,
     meta: { requiresAuth: true } 
+  },
+
+  {
+    path: '/discussion/:id',
+    name: 'DiscussionDetail',
+    component: DiscussionDetail,
+    meta: { requiresAuth: true }
   },
 
   { path: "/", redirect: "/login" },

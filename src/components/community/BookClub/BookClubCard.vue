@@ -3,19 +3,17 @@ import Navbar from "../../layout/Navbar.vue";
 import AddMeeting from "../BookClub/AddMeeting.vue";
 import { ref, onMounted, computed } from "vue";
 import BookClubForm from "../BookClub/BookClubForm.vue";
+import DiscussionForm from "../BookClub/DiscussionForm.vue";
 import { useRoute, useRouter } from "vue-router";
 import axios from "axios";
-// Sửa import - Thêm USER_SERVICE_URL và AVATAR_SERVER_URL
 import { BOOK_SERVICE_URL, BOOKCLUB_IMAGE_SERVER_URL, USER_SERVICE_URL, AVATAR_SERVER_URL } from "../../../config";
 import { getProfile } from "../../../composables/useProfile";
 import { useAuth } from "../../../composables/useAuth";
 
-// Interface cho User (dùng trong tìm kiếm)
 interface SearchUser {
   id: number;
   username: string;
 }
-
 interface Club {
   id: number;
   name: string;
@@ -25,21 +23,27 @@ interface Club {
   rules?: string;
   creator_id?: number;
 }
-
 interface Meeting {
   id: number;
   title: string;
   date: string;
   status: "upcoming" | "past";
 }
-
-// 1. THÊM INTERFACE CHO THÀNH VIÊN
-// Dữ liệu này sẽ được tổng hợp ở frontend
 interface Member {
   user_id: number;
   role: string;
-  username: string; // Lấy từ getProfile
-  avatar_url?: string; // Lấy từ getProfile
+  username: string;
+  avatar_url?: string;
+}
+
+interface Discussion {
+  id: number;
+  title: string;
+  content: string;
+  user_id: number;
+  created_at: string;
+  user?: { username: string };
+  comment_count: number;
 }
 
 const route = useRoute();
@@ -49,26 +53,34 @@ const { userInfo } = useAuth();
 
 const club = ref<Club | null>(null);
 const meetings = ref<Meeting[]>([]);
-const activeTab = ref("upcoming");
+const activeTab = ref("upcoming"); // <-- Trả về 'upcoming'
 const showAddMeeting = ref(false);
 
 const showMenu = ref(false);
 const showEdit = ref(false);
 
-// Refs cho việc mời
 const searchQuery = ref("");
 const searchResults = ref<SearchUser[]>([]);
 const isSearching = ref(false);
 const inviteMessage = ref("");
 
-// 2. THÊM REFS CHO THÀNH VIÊN
 const memberCount = ref(0);
-const membersList = ref<Member[]>([]); // Danh sách đầy đủ (có profile)
+const membersList = ref<Member[]>([]);
+
+const discussionsList = ref<Discussion[]>([]);
+const showDiscussionForm = ref(false);
+const isLoadingDiscussions = ref(false);
 
 const isCreator = computed(() => {
   if (!userInfo.value || !club.value) return false;
   const userId = userInfo.value?.id || userInfo.value?.user_id;
   return userId === club.value.creator_id;
+});
+
+const isMember = computed(() => {
+  if (!userInfo.value || !membersList.value) return false;
+  const userId = userInfo.value?.id || userInfo.value?.user_id;
+  return membersList.value.some(member => member.user_id === userId);
 });
 
 async function searchUsers() {
@@ -90,7 +102,6 @@ async function searchUsers() {
     isSearching.value = false;
   }
 }
-
 async function sendInvite(inviteeId: number) {
   inviteMessage.value = "Đang gửi lời mời...";
   const creatorId = userInfo.value?.id || userInfo.value?.user_id;
@@ -112,25 +123,20 @@ async function sendInvite(inviteeId: number) {
     inviteMessage.value = err.response?.data?.detail || "Lỗi khi gửi lời mời";
   }
 }
-
 function goToMeeting(id: number) {
   router.push(`/meeting/${id}`);
 }
-
 function openEditClub() {
   showEdit.value = true;
   showMenu.value = false;
 }
-
 function handleEditCancel() {
   showEdit.value = false;
 }
-
 async function handleEditSaved() {
   showEdit.value = false;
   await loadData();
 }
-
 const rulesList = computed(() => {
   if (!club.value || !club.value.rules) {
     return [];
@@ -140,7 +146,6 @@ const rulesList = computed(() => {
     .filter(line => line.trim() !== '')
     .map(line => line.replace(/^\d+\.\s*/, ''));
 });
-
 async function getClub(clubId: number) {
   try {
     const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${clubId}`);
@@ -150,7 +155,6 @@ async function getClub(clubId: number) {
     return null;
   }
 }
-
 async function getMeetings(clubId: number) {
   try {
     const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${clubId}/meetings`);
@@ -160,25 +164,18 @@ async function getMeetings(clubId: number) {
     return [];
   }
 }
-
-// 3. SỬA HÀM getMemberCount
 async function getMemberCount(clubId: number) {
   try {
     const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${clubId}/member-count`);
-    return res.data; // Trả về { member_count: X }
+    return res.data;
   } catch (error) {
     console.error("Lỗi khi đếm thành viên:", error);
-    return { member_count: 0 }; // Trả về 0 nếu lỗi
+    return { member_count: 0 };
   }
 }
-
-// 4. SỬA HÀM getMembers ĐỂ LẤY PROFILE
 async function getMembers(clubId: number) {
   try {
-    // API này trả về List[BookClubMember] (chỉ có user_id, role)
     const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${clubId}/members`);
-
-    // Dùng Promise.all để gọi getProfile cho từng user_id
     const membersWithProfile = await Promise.all(
       res.data.map(async (member: { user_id: number; role: string }) => {
         const profile = await getProfile(member.user_id);
@@ -190,49 +187,116 @@ async function getMembers(clubId: number) {
         };
       })
     );
-    return membersWithProfile; // Trả về danh sách đã gộp profile
-
+    return membersWithProfile;
   } catch (error) {
     console.error("Lỗi khi lấy danh sách thành viên:", error);
     return [];
   }
 }
-// ---
-
 function handleMeetingCreated() {
   showAddMeeting.value = false;
   loadData();
 }
 
-// 5. SỬA LẠI HOÀN CHỈNH HÀM LOADDATA
+async function getDiscussions(clubId: number) {
+  isLoadingDiscussions.value = true;
+  try {
+    const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${clubId}/discussions`);
+
+    const discussionsWithData = await Promise.all(
+      res.data.map(async (discussion: Discussion) => {
+        const profile = await getProfile(discussion.user_id);
+
+        return {
+          ...discussion,
+          user: { username: profile?.username || "Người dùng ẩn" },
+        };
+      })
+    );
+    discussionsList.value = discussionsWithData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch (error) {
+    console.error("Lỗi khi lấy danh sách thảo luận:", error);
+  } finally {
+    isLoadingDiscussions.value = false;
+  }
+}
+
+function handleDiscussionCreated() {
+  showDiscussionForm.value = false;
+  getDiscussions(clubId);
+}
+
+
+
+async function joinClub() {
+  const userId = userInfo.value?.id || userInfo.value?.user_id;
+  if (!userId) {
+    alert("Vui lòng đăng nhập để tham gia!");
+    return;
+  }
+  try {
+    const formData = new FormData();
+    formData.append("user_id", String(userId));
+    // Gọi API POST /.../join (backend bạn đã có)
+    await axios.post(`${BOOK_SERVICE_URL}bookclubs/${clubId}/join`, formData);
+
+    // Tải lại dữ liệu thành viên để cập nhật nút bấm và số lượng
+    await Promise.all([getMemberCount(clubId), getMembers(clubId)]).then(([countData, memberData]) => {
+      memberCount.value = countData?.member_count || 0;
+      membersList.value = memberData || [];
+    });
+  } catch (err: any) {
+    alert(err.response?.data?.detail || "Lỗi khi tham gia");
+  }
+}
+
+async function leaveClub() {
+  const userId = userInfo.value?.id || userInfo.value?.user_id;
+  if (!userId) {
+    alert("Vui lòng đăng nhập!");
+    return;
+  }
+  if (!confirm("Bạn có chắc muốn rời khỏi câu lạc bộ này?")) return;
+
+  try {
+    const formData = new FormData();
+    formData.append("user_id", String(userId));
+
+    await axios.delete(`${BOOK_SERVICE_URL}bookclubs/${clubId}/leave`, {
+      data: formData
+    });
+
+    await Promise.all([getMemberCount(clubId), getMembers(clubId)]).then(([countData, memberData]) => {
+      memberCount.value = countData?.member_count || 0;
+      membersList.value = memberData || [];
+    });
+  } catch (err: any) {
+    alert(err.response?.data?.detail || "Lỗi khi rời khỏi");
+  }
+}
+
 async function loadData() {
-  // Lấy club trước
   const clubData = await getClub(clubId);
   if (clubData) {
     const profile = await getProfile(clubData.creator_id);
     club.value = { ...clubData, creator_name: profile.username };
   } else {
-    return; // Dừng nếu không tìm thấy club
+    return;
   }
 
-  // Lấy (Meetings, Count, Member List) cùng lúc để tăng tốc
-  const [meetingData, memberCountData, memberListData] = await Promise.all([
+  const [meetingData, memberCountData, memberListData, discussionData] = await Promise.all([
     getMeetings(clubId),
     getMemberCount(clubId),
-    getMembers(clubId)
+    getMembers(clubId),
+    getDiscussions(clubId)
   ]);
 
-  // Xử lý Meetings
   const now = new Date();
   meetings.value = (meetingData || []).map((m: any) => ({
     ...m,
     status: new Date(m.date) > now ? "upcoming" : "past",
   }));
-
-  // Xử lý Member Count
   memberCount.value = memberCountData?.member_count || 0;
-
-  // Xử lý Member List
   membersList.value = memberListData || [];
 }
 
@@ -269,8 +333,13 @@ onMounted(() => {
                 ⋮
               </button>
               <div v-if="showMenu" class="absolute right-0 mt-2 w-32 bg-white border rounded-md shadow-lg z-10">
-                <button v-if="isCreator" @click="openEditClub" class="block w-full text-left ...">
+                <button v-if="isCreator" @click="openEditClub"
+                  class="block w-full text-left px-3 py-2 text-sm hover:bg-yellow-50 rounded-md text-gray-700">
                   ✏️ Chỉnh sửa
+                </button>
+                <button v-if="!isCreator && isMember" @click="leaveClub"
+                  class="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md">
+                  Rời khỏi
                 </button>
               </div>
             </div>
@@ -281,19 +350,24 @@ onMounted(() => {
             <span class="font-semibold text-yellow-600">{{ club.creator_name }}</span>
           </p>
 
-          <!-- 6. THÊM SỐ LƯỢNG THÀNH VIÊN VÀO HEADER -->
           <p class="text-gray-500 text-sm mt-1">
             {{ memberCount }} thành viên
           </p>
 
+          <button v-if="!isCreator && !isMember" @click="joinClub"
+            class="mt-3 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black text-sm font-semibold rounded-md shadow-sm">
+            Tham gia câu lạc bộ
+          </button>
+
         </div>
       </div>
 
-      <!-- 7. THÊM TAB "THÀNH VIÊN" -->
-      <div class="flex space-x-6 mt-4 border-b border-gray-200">
+      <!-- SỬA LẠI TABS (XÓA KHỐI LẶP) -->
+      <div v-if="isMember" class="flex space-x-6 mt-4 border-b border-gray-200">
         <button v-for="tab in [
           { key: 'upcoming', label: 'Cuộc họp sắp tới' },
           { key: 'past', label: 'Cuộc họp đã qua' },
+          { key: 'discussions', label: 'Thảo luận' },
           { key: 'members', label: 'Thành viên' },
           { key: 'about', label: 'Giới thiệu' },
           { key: 'rules', label: 'Nội quy' },
@@ -305,9 +379,23 @@ onMounted(() => {
           {{ tab.label }}
         </button>
       </div>
+      <div v-else class="flex space-x-6 mt-4 border-b border-gray-200">
+        <button v-for="tab in [
+          { key: 'about', label: 'Giới thiệu' },
+          { key: 'rules', label: 'Nội quy' },
+          { key: 'members', label: 'Thành viên' },
+        ]" :key="tab.key" @click="activeTab = tab.key" class="py-2 text-sm font-medium transition-colors border-b-2"
+          :class="activeTab === tab.key
+            ? 'text-yellow-600 border-yellow-400'
+            : 'text-gray-500 border-transparent hover:text-gray-700'
+            ">
+          {{ tab.label }}
+        </button>
+      </div>
 
+      <!-- NỘI DUNG TABS -->
       <div class="mt-6">
-        <div v-if="activeTab === 'upcoming'">
+        <div v-if="activeTab === 'upcoming' && isMember">
           <div v-if="showAddMeeting">
             <AddMeeting :club-id="clubId" @created="handleMeetingCreated" @cancel="showAddMeeting = false" />
           </div>
@@ -315,8 +403,8 @@ onMounted(() => {
             <div v-if="meetings.filter(m => m.status === 'upcoming').length === 0"
               class="text-center py-10 text-gray-500">
               <p class="font-semibold italic mb-3">Chưa có cuộc họp sắp tới</p>
-
-              <button v-if="isCreator" @click="showAddMeeting = true" class="px-4 py-2 bg-yellow-400 ...">
+              <button v-if="isCreator" @click="showAddMeeting = true"
+                class="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded-md transition">
                 + Tạo cuộc họp mới
               </button>
             </div>
@@ -326,10 +414,10 @@ onMounted(() => {
                 <div>
                   <p class="font-semibold text-gray-800">{{ meeting.title }}</p>
                   <p class="text-sm text-gray-500">
-                    Ngày: {{ new Date(meeting.date).toLocaleDateString() }},
+                    Ngày: {{ new Date(meeting.date).toLocaleDateString('vi-VN') }},
                     Giờ:
                     {{
-                      new Date(meeting.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      new Date(meeting.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
                     }}
                   </p>
                 </div>
@@ -339,7 +427,8 @@ onMounted(() => {
                 </button>
               </div>
               <div v-if="isCreator" class="flex justify-center mt-6">
-                <button @click="showAddMeeting = true" class="px-4 py-2 bg-yellow-400 ...">
+                <button @click="showAddMeeting = true"
+                  class="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded-md transition">
                   + Thêm cuộc họp
                 </button>
               </div>
@@ -347,8 +436,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- (Code tab 'past' giữ nguyên) -->
-        <div v-else-if="activeTab === 'past'">
+        <div v-else-if="activeTab === 'past' && isMember">
           <div v-if="meetings.filter(m => m.status === 'past').length === 0" class="text-center text-gray-500 py-10">
             <p>Chưa có cuộc họp nào trước đây.</p>
           </div>
@@ -358,10 +446,10 @@ onMounted(() => {
               <div>
                 <p class="font-semibold text-gray-800">{{ meeting.title }}</p>
                 <p class="text-sm text-gray-500">
-                  Ngày: {{ new Date(meeting.date).toLocaleDateString() }},
+                  Ngày: {{ new Date(meeting.date).toLocaleDateString('vi-VN') }},
                   Giờ:
                   {{
-                    new Date(meeting.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    new Date(meeting.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
                   }}
                 </p>
               </div>
@@ -373,10 +461,54 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 8. NỘI DUNG TAB "THÀNH VIÊN" -->
+        <div v-else-if="activeTab === 'discussions' && isMember">
+
+          <div v-if="showDiscussionForm">
+            <DiscussionForm :club-id="clubId" @created="handleDiscussionCreated" @cancel="showDiscussionForm = false" />
+          </div>
+
+          <div v-else>
+            <div v-if="isCreator" class="flex justify-end mb-4">
+              <button @click="showDiscussionForm = true"
+                class="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded-md transition">
+                + Tạo thảo luận mới
+              </button>
+            </div>
+
+            <div v-if="isLoadingDiscussions" class="text-center py-10 text-gray-500">
+              Đang tải thảo luận...
+            </div>
+
+            <div v-else-if="discussionsList.length === 0"
+              class="text-center py-16 text-gray-500 bg-gray-50 rounded-lg border">
+              <span class="text-6xl">💬</span>
+              <h3 class="text-xl font-semibold mt-4 text-gray-800">Chưa có thảo luận</h3>
+              <p class="mt-1 text-gray-600">
+                {{ isCreator ? 'Hãy tạo một chủ đề để mọi người cùng trao đổi!' : 'Chưa có chủ đề nào được tạo.' }}
+              </p>
+            </div>
+
+            <div v-else class="space-y-4">
+              <router-link v-for="post in discussionsList" :key="post.id" :to="'/discussion/' + post.id"
+                class="block p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition">
+                <p class="text-sm text-gray-500">
+                  Đăng bởi <span class="font-medium text-gray-700">{{ post.user?.username }}</span>
+                  <span class="ml-2">&bull; {{ new Date(post.created_at).toLocaleDateString('vi-VN') }}</span>
+                </p>
+                <h3 class="text-lg font-semibold text-gray-800 mt-1">{{ post.title }}</h3>
+                <p class="text-gray-600 mt-1 truncate">
+                  {{ post.content }}
+                </p>
+                <p class="text-sm text-yellow-600 font-medium mt-2">
+                  {{ post.comment_count }} bình luận &rarr;
+                </p>
+              </router-link>
+            </div>
+          </div>
+        </div>
+
         <div v-else-if="activeTab === 'members'">
 
-          <!-- Phần Mời (Chỉ Host thấy) -->
           <div v-if="isCreator" class="mb-8 p-4 bg-gray-50 rounded-lg border">
             <h3 class="text-lg font-semibold text-yellow-600 mb-3">Mời thành viên</h3>
             <input v-model="searchQuery" @input="searchUsers" type="text"
@@ -398,14 +530,12 @@ onMounted(() => {
             <p v-if="inviteMessage" class="text-sm text-green-600 mt-3">{{ inviteMessage }}</p>
           </div>
 
-          <!-- Phần Danh sách thành viên -->
           <div>
             <h3 class="text-lg font-semibold text-yellow-600 mb-3">
               Tất cả thành viên ({{ memberCount }})
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-              <!-- 9. SỬA LẠI VÒNG LẶP ĐỂ DÙNG ROUTER-LINK -->
               <router-link v-for="member in membersList" :key="member.user_id" :to="'/profile/' + member.user_id"
                 class="flex items-center gap-3 p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                 <div
@@ -433,7 +563,6 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- (Code tab 'about' giữ nguyên) -->
         <div v-else-if="activeTab === 'about'">
           <div class="bg-gray-50 p-4 sm:p-5 rounded-lg border">
             <p class="whitespace-pre-line leading-relaxed text-gray-800">
@@ -442,7 +571,6 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- (Code tab 'rules' giữ nguyên) -->
         <div v-else-if="activeTab === 'rules'">
           <div v-if="rulesList.length > 0" class="bg-gray-50 p-4 sm:p-6 rounded-lg border">
             <ol class="list-decimal list-outside pl-5 space-y-2 text-gray-800 leading-relaxed">
@@ -458,5 +586,5 @@ onMounted(() => {
       </div>
     </div>
   </div>
-
+  
 </template>

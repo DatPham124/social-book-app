@@ -3,6 +3,7 @@ import { Ref, ref } from "vue";
 import { useBookSearch } from "../../../composables/useBookSearch";
 import { BOOK_SERVICE_URL } from "../../../config";
 import axios from "axios";
+import { useAuth } from "../../../composables/useAuth"; // <-- 1. THÊM IMPORT
 
 const props = defineProps<{ clubId: number }>();
 const emit = defineEmits(["created", "cancel"]);
@@ -11,6 +12,8 @@ const title = ref("");
 const date = ref("");
 const time = ref("");
 const selectedBook = ref<Book | null>(null);
+
+const { userInfo } = useAuth(); // <-- 2. LẤY USERINFO
 
 interface Book {
   id: number;
@@ -31,9 +34,20 @@ function handleSelectBook(book: Book) {
   results.value = [];
 }
 
+// 3. SỬA HÀM NÀY
 async function createMeeting() {
+  // Lấy user_id
+  const userId = userInfo.value?.id || userInfo.value?.user_id;
+
   if (!title.value || !date.value || !time.value) {
-    alert("Vui lòng điền đầy đủ thông tin và chọn sách!");
+    // Sửa lại alert cho đúng (sách là không bắt buộc)
+    alert("Vui lòng điền tên, ngày và giờ họp!");
+    return;
+  }
+
+  // Thêm kiểm tra user_id
+  if (!userId) {
+    alert("Lỗi: Không thể xác thực người dùng. Vui lòng đăng nhập lại.");
     return;
   }
 
@@ -42,20 +56,22 @@ async function createMeeting() {
     const formData = new FormData();
     formData.append("title", title.value);
     formData.append("date", datetimeLocal);
+    formData.append("user_id", String(userId)); // <-- THÊM USER_ID VÀO FORM
 
     if (selectedBook.value) {
       formData.append("book_id", String(selectedBook.value.id));
-      console.log(selectedBook.value.id)
     }
+
     await axios.post(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}/meetings`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
     alert("Tạo cuộc họp thành công!");
     emit("created");
-  } catch (error) {
+  } catch (error: any) {
     console.error("Lỗi khi tạo cuộc họp:", error);
-    alert("Tạo cuộc họp thất bại, vui lòng thử lại!");
+    // Hiển thị lỗi chính xác từ backend
+    alert(error.response?.data?.detail || "Tạo cuộc họp thất bại, vui lòng thử lại!");
   }
 }
 </script>
@@ -83,7 +99,7 @@ async function createMeeting() {
       </div>
 
       <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1">Chọn sách</label>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Chọn sách (Không bắt buộc)</label>
         <input v-model="query" @input="searchBooks" type="text" class="w-full border rounded-md px-3 py-2"
           placeholder="Nhập tên sách để tìm..." />
 

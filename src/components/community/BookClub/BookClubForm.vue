@@ -131,17 +131,24 @@ async function deleteClub() {
   message.value = "";
   const token = localStorage.getItem("token");
 
-  if (!token) {
+  const decoded = loadUserFromToken();
+  const userId = decoded?.id || decoded?.user_id;
+
+  if (!token || !userId) { 
     message.value = "Vui lòng đăng nhập!";
     isDeleting.value = false;
     return;
   }
+
+  const formData = new FormData();
+  formData.append("user_id", String(userId));
 
   try {
     await axios.delete(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      data: formData 
     });
 
     message.value = "Đã xóa câu lạc bộ thành công!";
@@ -159,7 +166,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="bg-white rounded-lg shadow p-6 text-gray-700 max-w-3xl mx-auto">
+  <div class=" text-gray-700 max-w-5xl">
     <h3 class="text-lg font-semibold text-yellow-500 mb-4">
       {{ props.clubId ? "Chỉnh sửa câu lạc bộ" : "Tạo câu lạc bộ mới" }}
     </h3>

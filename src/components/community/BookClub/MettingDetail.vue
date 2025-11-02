@@ -1,128 +1,231 @@
 <script setup lang="ts">
-import { Ref, ref } from "vue";
-import { useBookSearch } from "../../../composables/useBookSearch";
-import { BOOK_SERVICE_URL } from "../../../config";
+import { ref, onMounted, Ref, computed } from "vue";
 import axios from "axios";
-import { useAuth } from "../../../composables/useAuth"; 
+import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from "../../../config"; // Thêm COVER_IMAGE_SERVER_URL
+import { useAuth } from "../../../composables/useAuth";
+import { useRoute } from "vue-router";
+import Navbar from "../../layout/Navbar.vue";
+import { useBooks } from "../../../composables/useBook"; // Sửa 'useBook' thành 'useBooks'
 
-const props = defineProps<{ clubId: number }>();
-const emit = defineEmits(["created", "cancel"]);
+const route = useRoute();
+const meetingId = Number(route.params.id);
 
-const title = ref("");
-const date = ref("");
-const time = ref("");
-const selectedBook = ref<Book | null>(null);
+const { fetchBook } = useBooks();
+const { userInfo } = useAuth();
 
-const { userInfo } = useAuth(); 
-
+// --- Interfaces ---
 interface Book {
   id: number;
   title: string;
-  author?: string;
   cover_url?: string;
+  author?: string;
+  categories?: string[];
 }
 
-const { query, results, searchBooks } = useBookSearch() as {
-  query: Ref<string>;
-  results: Ref<Book[]>;
-  searchBooks: () => Promise<void>;
-};
-
-function handleSelectBook(book: Book) {
-  selectedBook.value = book;
-  query.value = book.title;
-  results.value = [];
+interface Meeting {
+  id: number;
+  title: string;
+  date: string;
+  location?: string;
+  agenda?: string;
+  book_id?: number;
+  book?: Book; 
+  creator_id?: number; // API backend CẦN trả về trường này
 }
 
-// 3. SỬA HÀM createMeeting
-async function createMeeting() {
-  // Lấy user_id từ userInfo
+// --- State ---
+const meeting: Ref<Meeting | null> = ref(null);
+const loading = ref(true);
+
+// State cho việc sửa Agenda
+const isEditingAgenda = ref(false);
+const editedAgenda = ref("");
+const isSavingAgenda = ref(false);
+
+// --- Computed ---
+const isCreator = computed(() => {
+  if (!userInfo.value || !meeting.value) return false;
   const userId = userInfo.value?.id || userInfo.value?.user_id;
+  // Kiểm tra user hiện tại có phải là người tạo club không
+  return userId === meeting.value.creator_id;
+});
 
-  if (!title.value || !date.value || !time.value) {
-    // Sửa lại câu alert cho đúng
-    alert("Vui lòng điền tên, ngày và giờ họp!");
-    return;
-  }
-
-  // Thêm kiểm tra user_id
-  if (!userId) {
-    alert("Lỗi: Không thể xác thực người dùng. Vui lòng đăng nhập lại.");
-    return;
-  }
-
+// --- API Functions ---
+async function loadMeetingDetails() {
   try {
-    const datetimeLocal = `${date.value}T${time.value}:00`;
-    const formData = new FormData();
-    formData.append("title", title.value);
-    formData.append("date", datetimeLocal);
-    formData.append("user_id", String(userId)); // <-- GỬI user_id LÊN BACKEND
+    // API này (GET /bookclubs/meeting/{id})
+    // CẦN PHẢI TRẢ VỀ CẢ `creator_id` CỦA CLUB
+    const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/meeting/${meetingId}`);
+    meeting.value = res.data;
+    editedAgenda.value = res.data.agenda || "";
+  } catch (error) {
+    console.error("Lỗi tải chi tiết cuộc họp:", error);
+  }
+}
 
-    if (selectedBook.value) {
-      formData.append("book_id", String(selectedBook.value.id));
+async function saveAgenda() {
+  const userId = userInfo.value?.id || userInfo.value?.user_id;
+  if (!userId) {
+     alert("Lỗi: Không thể xác thực người dùng!");
+     return;
+  }
+
+  isSavingAgenda.value = true;
+  try {
+    const formData = new FormData();
+    formData.append("agenda", editedAgenda.value);
+    formData.append("user_id", String(userId)); // Gửi user_id để backend xác thực
+
+    // API MỚI: PUT /bookclubs/meeting/{id}/agenda
+    await axios.put(
+      `${BOOK_SERVICE_URL}bookclubs/meeting/${meetingId}/agenda`,
+      formData
+    );
+
+    // Cập nhật state ở frontend (tránh lỗi mất dữ liệu)
+    if (meeting.value) {
+      meeting.value.agenda = editedAgenda.value;
     }
     
-    await axios.post(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}/meetings`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
-    alert("Tạo cuộc họp thành công!");
-    emit("created");
-  } catch (error: any) { // Thêm kiểu 'any'
-    console.error("Lỗi khi tạo cuộc họp:", error);
-    // Hiển thị lỗi từ backend nếu có
-    alert(error.response?.data?.detail || "Tạo cuộc họp thất bại, vui lòng thử lại!");
+    isEditingAgenda.value = false;
+    
+  } catch (error: any) {
+    console.error("Lỗi lưu agenda:", error);
+    alert(error.response?.data?.detail || "Lưu thất bại!");
+  } finally {
+    isSavingAgenda.value = false;
   }
 }
+
+// --- Logic xử lý cho nút Sửa / Hủy ---
+function startEditAgenda() {
+  isEditingAgenda.value = true;
+  // (Không cần gán editedAgenda.value ở đây vì nó đã đồng bộ 2 chiều với v-model)
+}
+
+function cancelEditAgenda() {
+  isEditingAgenda.value = false;
+  // Reset lại nội dung về giá trị gốc
+  editedAgenda.value = meeting.value?.agenda || "";
+}
+
+// --- Lifecycle ---
+onMounted(async () => {
+  loading.value = true;
+  // 1. Tải thông tin cuộc họp (chứa book_id và creator_id)
+  await loadMeetingDetails();
+
+  // 2. Dùng book_id (nếu có) để tải thông tin sách
+  if (meeting.value && meeting.value.book_id) {
+    const bookData = await fetchBook(meeting.value.book_id);
+    if (bookData && meeting.value) {
+      // Gán thông tin sách vào meeting.book
+      meeting.value.book = bookData;
+    }
+  }
+
+  loading.value = false;
+});
 </script>
 
 <template>
-  <div class="p-6 border rounded-lg bg-gray-50">
-    <h3 class="text-lg font-semibold mb-4 text-gray-700">Tạo cuộc họp mới</h3>
+  <Navbar />
 
-    <div class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1">Tên cuộc họp</label>
-        <input v-model="title" type="text" class="w-full border rounded-md px-3 py-2"
-          placeholder="Nhập tiêu đề cuộc họp" />
-      </div>
+  <!-- Container của trang -->
+  <div class="max-w-2xl mx-auto p-4 sm:p-6 mt-8">
+    <div v-if="loading" class="text-center text-gray-500 text-lg py-10">Đang tải chi tiết...</div>
 
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium text-gray-600 mb-1">Ngày họp</label>
-          <input v-model="date" type="date" class="w-full border rounded-md px-3 py-2" />
+    <div v-else-if="!meeting" class="bg-white p-6 rounded-lg text-red-500 text-center">
+      Không tìm thấy cuộc họp.
+    </div>
+
+    <!-- Nội dung chính của trang -->
+    <div v-else class="bg-white rounded-lg shadow-xl w-full flex flex-col">
+      
+      <!-- Header: Thông tin cuộc họp -->
+      <div class="border-b p-4 sm:p-5 relative">
+        <p class="text-sm font-semibold text-yellow-600">CHI TIẾT CUỘC HỌP</p>
+        <h2 class="text-2xl font-bold text-gray-800 mt-1">{{ meeting.title }}</h2>
+
+        <div class="flex items-center text-gray-600 mt-2 space-x-4">
+          <div class="flex items-center">
+            <span class="mr-2 text-lg">🗓️</span>
+            <span>{{ new Date(meeting.date).toLocaleString('vi-VN', { dateStyle: 'long', timeStyle: 'short' }) }}</span>
+          </div>
+          <!-- (Đã bỏ vị trí theo yêu cầu) -->
         </div>
+      </div>
+
+      <!-- Body: Chi tiết sách và Ghi chú -->
+      <div class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6">
+        
+        <!-- Phần Sách thảo luận -->
         <div>
-          <label class="block text-sm font-medium text-gray-600 mb-1">Giờ họp</label>
-          <input v-model="time" type="time" class="w-full border rounded-md px-3 py-2" />
+          <h3 class="text-lg font-semibold text-gray-700 mb-2">Sách thảo luận</h3>
+          <div v-if="meeting.book" class="flex items-center gap-4 bg-gray-50 p-3 rounded-lg border">
+            <img 
+              v-if="meeting.book.cover_url"
+              :src="`${COVER_IMAGE_SERVER_URL}/${meeting.book.cover_url}`" 
+              :alt="meeting.book.title"
+              class="w-12 h-16 object-cover rounded shadow-sm"
+            />
+            <div v-else class="w-12 h-16 bg-gray-200 rounded flex items-center justify-center text-lg">📚</div>
+            
+            <div>
+              <p class="font-semibold text-gray-800">{{ meeting.book.title }}</p>
+              <p class="text-sm text-gray-500">{{ meeting.book.author }}</p>
+            </div>
+          </div>
+          <div v-else class="text-gray-500 italic bg-gray-50 p-3 rounded-lg border">
+            Chưa chọn sách cho cuộc họp này.
+          </div>
         </div>
-      </div>
 
-      <div>
-        <label class="block text-sm font-medium text-gray-600 mb-1">Chọn sách (Không bắt buộc)</label>
-        <input v-model="query" @input="searchBooks" type="text" class="w-full border rounded-md px-3 py-2"
-          placeholder="Nhập tên sách để tìm..." />
+        <!-- Phần Ghi chú/Agenda -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="text-lg font-semibold text-gray-700">Chương trình họp / Ghi chú</h3>
+            
+            <!-- Nút "Chỉnh sửa" (Chỉ chủ club mới thấy) -->
+            <div v-if="isCreator">
+              <button v-if="!isEditingAgenda" @click="startEditAgenda"
+                class="text-sm text-yellow-600 hover:text-yellow-800 font-medium">
+                Chỉnh sửa
+              </button>
+            </div>
+          </div>
 
-        <ul v-if="results.length" class="border rounded-md mt-2 bg-white shadow-sm max-h-48 overflow-y-auto">
-          <li v-for="book in results" :key="book.id" @click="handleSelectBook(book)"
-            class="px-3 py-2 hover:bg-yellow-50 cursor-pointer">
-            {{ book.title }}
-          </li>
-        </ul>
+          <!-- Giao diện CHỈNH SỬA (chỉ chủ club thấy) -->
+          <div v-if="isEditingAgenda && isCreator">
+            <textarea v-model="editedAgenda" rows="8"
+              class="w-full border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-yellow-400 focus:outline-none"
+              placeholder="Nhấn vào đây để thêm ghi chú hoặc chương trình họp..."></textarea>
+            <div class="flex justify-end gap-3 mt-3">
+              <button @click="cancelEditAgenda"
+                class="px-3 py-1 border border-gray-400 rounded-md text-gray-600 hover:bg-gray-100">
+                Hủy
+              </button>
+              <button @click="saveAgenda" :disabled="isSavingAgenda"
+                class="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded-md disabled:opacity-50">
+                {{ isSavingAgenda ? 'Đang lưu...' : 'Lưu' }}
+              </button>
+            </div>
+          </div>
 
-        <p v-if="selectedBook" class="mt-2 text-sm text-gray-700">
-          📚 Đã chọn: <strong>{{ selectedBook.title }}</strong>
-        </p>
-      </div>
-
-      <div class="flex justify-end space-x-3 mt-6">
-        <button @click="$emit('cancel')" class="px-4 py-2 border rounded-md text-gray-600 hover:bg-gray-100">
-          Hủy
-        </button>
-        <button @click="createMeeting" class="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 rounded-md font-semibold">
-          Tạo
-        </button>
+          <!-- Giao diện CHỈ ĐỌC (cho mọi người) -->
+          <div v-else>
+            <div class="bg-gray-50 p-4 rounded-lg border min-h-[100px]">
+              <p v-if="meeting.agenda" class="text-gray-800 whitespace-pre-line leading-relaxed">
+                {{ meeting.agenda }}
+              </p>
+              <p v-else class="text-gray-500 italic">
+                {{ isCreator ? 'Chưa có ghi chú. Bấm "Chỉnh sửa" để thêm.' : 'Chưa có ghi chú hay chương trình họp nào.' }}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
+
