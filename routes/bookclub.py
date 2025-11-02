@@ -228,9 +228,9 @@ def add_book(club_id: int, book_id: int, session: Session = Depends(get_session_
 @router.post("/{club_id}/discussion")
 def create_discussion(
     club_id: int,
-    user_id: int,
-    title: str,
-    content: str,
+    user_id: int = Form(...),
+    title: str = Form(...),
+    content: str = Form(...),
     session: Session = Depends(get_session_book_service),
 ):
     discussion = BookClubDiscussion(
@@ -245,12 +245,11 @@ def create_discussion(
     session.refresh(discussion)
     return discussion
 
-
 @router.post("/discussion/{discussion_id}/comment")
 def add_comment(
     discussion_id: int,
-    user_id: int,
-    content: str,
+    user_id: int = Form(...),
+    content: str = Form(...),
     session: Session = Depends(get_session_book_service),
 ):
     comment = BookClubComment(
@@ -265,11 +264,62 @@ def add_comment(
     return comment
 
 
-@router.get("/{club_id}/discussions")
+class DiscussionWithCount(BookClubDiscussion):
+    comment_count: int
+
+@router.get("/{club_id}/discussions", response_model=List[DiscussionWithCount])
 def list_discussions(club_id: int, session: Session = Depends(get_session_book_service)):
-    return session.exec(
-        select(BookClubDiscussion).where(BookClubDiscussion.club_id == club_id)
+    
+    statement = (
+        select(
+            BookClubDiscussion, 
+            func.count(BookClubComment.id).label("comment_count")
+        )
+        .join(
+            BookClubComment, 
+            BookClubDiscussion.id == BookClubComment.discussion_id, 
+            isouter=True 
+        )
+        .where(BookClubDiscussion.club_id == club_id)
+        .group_by(BookClubDiscussion.id) 
+        .order_by(BookClubDiscussion.created_at.desc())
+    ) 
+    
+    results = session.exec(statement).all()
+
+
+    discussions_with_count = []
+    for discussion, count in results:
+        discussion_data = discussion.dict()
+        discussion_data["comment_count"] = count
+        discussions_with_count.append(DiscussionWithCount(**discussion_data))
+    
+    return discussions_with_count
+
+    
+@router.get("/discussion/{discussion_id}")
+def get_discussion_details(
+    discussion_id: int, 
+    session: Session = Depends(get_session_book_service)
+):
+    discussion = session.get(BookClubDiscussion, discussion_id)
+    if not discussion:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bài thảo luận")
+    
+    return discussion
+
+@router.get("/discussion/{discussion_id}/comments", response_model=List[BookClubComment])
+def get_discussion_comments(
+    discussion_id: int, 
+    session: Session = Depends(get_session_book_service)
+):
+    comments = session.exec(
+        select(BookClubComment)
+        .where(BookClubComment.discussion_id == discussion_id)
+        .order_by(BookClubComment.created_at.asc())
     ).all()
+    
+    return comments
 
 @router.post("/{club_id}/upload_image")
 def upload_club_image(
