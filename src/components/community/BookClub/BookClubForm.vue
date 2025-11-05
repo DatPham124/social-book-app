@@ -2,10 +2,8 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import axios from "axios";
-import { BOOK_SERVICE_URL } from "../../../config";
+import { BOOK_SERVICE_URL, BOOKCLUB_IMAGE_SERVER_URL } from "../../../config";
 import { useAuth } from "../../../composables/useAuth";
-
-import { BOOKCLUB_IMAGE_SERVER_URL } from "../../../config";
 
 const emit = defineEmits(["saved", "cancel"]);
 
@@ -18,7 +16,7 @@ const props = defineProps({
   },
 });
 
-const { loadUserFromToken } = useAuth();
+const { loadUserFromToken, userInfo } = useAuth();
 
 const loading = ref(false);
 const isDeleting = ref(false); 
@@ -28,6 +26,7 @@ const form = ref({
   name: "",
   description: "",
   rules: "",
+  is_public: true, // Thêm trường is_public
   avatar: null as File | null,
   avatar_url: "",
 });
@@ -42,6 +41,7 @@ async function loadClubInfo() {
     form.value.name = club.name;
     form.value.description = club.description || "";
     form.value.rules = club.rules || "";
+    form.value.is_public = club.is_public;
     form.value.avatar_url = club.avatar_url || "";
   } catch (err: any) {
     message.value = err.response?.data?.detail || "Không thể tải thông tin câu lạc bộ!";
@@ -76,7 +76,10 @@ async function saveClub() {
   message.value = "";
 
   const token = localStorage.getItem("token");
-  if (!token) {
+  const decoded = loadUserFromToken();
+  const userId = decoded?.id || decoded?.user_id;
+
+  if (!token || !userId) {
     message.value = "Vui lòng đăng nhập!";
     loading.value = false;
     return;
@@ -86,12 +89,15 @@ async function saveClub() {
   formData.append("name", form.value.name);
   formData.append("description", form.value.description);
   formData.append("rules", form.value.rules);
+  formData.append("is_public", String(form.value.is_public));
   if (form.value.avatar) formData.append("file", form.value.avatar);
 
   try {
     let res;
 
     if (props.clubId) {
+      formData.append("user_id", String(userId));
+      
       res = await axios.put(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -99,9 +105,7 @@ async function saveClub() {
         },
       });
     } else {
-      const decoded = loadUserFromToken();
-      const creatorId = decoded?.id || decoded?.user_id;
-      formData.append("creator_id", String(creatorId));
+      formData.append("creator_id", String(userId));
 
       res = await axios.post(`${BOOK_SERVICE_URL}bookclubs/create`, formData, {
         headers: {
@@ -122,10 +126,7 @@ async function saveClub() {
 
 async function deleteClub() {
   if (!props.clubId) return;
-
-  if (!confirm("Bạn có chắc chắn muốn xóa câu lạc bộ này không? Mọi dữ liệu liên quan (thảo luận, thành viên...) sẽ bị mất vĩnh viễn.")) {
-    return;
-  }
+  if (!confirm("Bạn có chắc muốn xóa câu lạc bộ này không?")) return;
 
   isDeleting.value = true;
   message.value = "";
@@ -187,7 +188,6 @@ onMounted(() => {
             ? form.avatar_url
             : `${BOOKCLUB_IMAGE_SERVER_URL}/${form.avatar_url}`" class="w-32 h-32 object-cover rounded-md" />
         </div>
-
       </div>
 
       <div>
@@ -200,6 +200,36 @@ onMounted(() => {
         <label class="block font-medium mb-1">Nội quy</label>
         <textarea v-model="form.rules" rows="3"
           class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-yellow-400 focus:outline-none"></textarea>
+      </div>
+
+      <div>
+        <label class="block font-medium mb-1">Quyền riêng tư</label>
+        <div class="space-y-2">
+          <label class="flex items-center p-3 bg-gray-50 border rounded-md cursor-pointer">
+            <input 
+              type="radio" 
+              :value="true" 
+              v-model="form.is_public" 
+              class="h-4 w-4 text-yellow-500 border-gray-400 focus:ring-yellow-400"
+            >
+            <span class="ml-3 text-sm">
+              <span class="font-medium text-gray-800">Công khai</span>
+              <p class="text-gray-500">Bất kỳ ai cũng có thể thấy và tham gia.</p>
+            </span>
+          </label>
+          <label class="flex items-center p-3 bg-gray-50 border rounded-md cursor-pointer">
+            <input 
+              type="radio" 
+              :value="false" 
+              v-model="form.is_public" 
+              class="h-4 w-4 text-yellow-500 border-gray-400 focus:ring-yellow-400"
+            >
+            <span class="ml-3 text-sm">
+              <span class="font-medium text-gray-800">Riêng tư</span>
+              <p class="text-gray-500">Người dùng phải gửi yêu cầu để được tham gia.</p>
+            </span>
+          </label>
+        </div>
       </div>
 
       <p v-if="message" class="text-sm text-red-500">{{ message }}</p>

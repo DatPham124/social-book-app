@@ -13,6 +13,7 @@ interface TokenPayLoad {
   roles: number[];
   exp: number;
   user_id: number;
+  id: number;
 }
 
 const token = localStorage.getItem("token");
@@ -31,7 +32,6 @@ if (token) {
   }
 }
 
-// API: lấy chi tiết 1 cuốn sách
 async function get_book_by_id(book_id: number) {
   try {
     const response = await axios.get(`${BOOK_SERVICE_URL}books/${book_id}`);
@@ -42,17 +42,18 @@ async function get_book_by_id(book_id: number) {
   }
 }
 
-// API: lấy danh sách "to_read"
 async function getToReadBooks() {
   if (!userInfo) {
     errorMessage.value = "Bạn chưa đăng nhập!";
     loading.value = false;
     return;
   }
+  
+  const userId = userInfo.user_id || userInfo.id;
 
   try {
     const response = await axios.get(
-      `${BOOK_SERVICE_URL}books/status/book/${userInfo.user_id}`,
+      `${BOOK_SERVICE_URL}books/status/book/${userId}`,
       { params: { status: "to_read" } }
     );
 
@@ -69,12 +70,10 @@ async function getToReadBooks() {
   } catch (error: any) {
     if (axios.isAxiosError(error) && error.response) {
       if (error.response.status === 404) {
-        // Trường hợp không tìm thấy sách
-        errorMessage.value = "Bạn chưa có sách nào trong mục Sẽ đọc.";
-      } else if (error.response.status === 400) {
-        errorMessage.value = "Yêu cầu không hợp lệ. Vui lòng thử lại.";
+        // API trả về 404 (đã sửa) nghĩa là không có sách, gán mảng rỗng
+        books.value = []; 
       } else {
-        errorMessage.value = "Đã xảy ra lỗi. Vui lòng thử lại sau.";
+        errorMessage.value = "Đã xảy ra lỗi.";
       }
     } else {
       errorMessage.value = "Không thể kết nối đến server.";
@@ -90,35 +89,46 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="bg-white p-6 rounded-lg shadow border">
+  <!-- 1. Thêm flex flex-col để xử lý chiều cao h-[325px] từ cha -->
+  <div class="bg-white p-6 rounded-lg shadow border h-full flex flex-col">
     <h3 class="text-lg font-semibold mb-4">Sẽ đọc ({{ books.length }})</h3>
 
-    <div v-if="loading">Đang tải...</div>
-    <div v-else-if="errorMessage" class="text-gray-500 italic">
-      {{ errorMessage }}
-    </div>
-    <div v-else>
-      <ul class="divide-y divide-gray-200">
-        <li v-for="item in books.slice(0, 3)" :key="item.book.id" class="py-2">
-          <router-link :to="{ name: 'book', params: { id: item.book.id } }">
+    <!-- 2. Thêm flex-1 overflow-y-auto để nội dung cuộn -->
+    <div class="flex-1 overflow-y-auto">
+      <div v-if="loading" class="text-gray-500 italic">Đang tải...</div>
+      
+      <!-- 3. Sửa logic hiển thị lỗi/trống -->
+      <div v-else-if="errorMessage" class="text-gray-500 italic">
+        {{ errorMessage }}
+      </div>
+      <div v-else-if="books.length === 0" class="text-gray-500 italic">
+        Bạn chưa có sách nào trong mục Sẽ đọc.
+      </div>
+      
+      <!-- 4. Danh sách (chỉ hiển thị khi có sách) -->
+      <div v-else>
+        <ul class="divide-y divide-gray-200">
+          <li v-for="item in books.slice(0, 3)" :key="item.book.id" class="py-2">
+            <router-link :to="{ name: 'book', params: { id: item.book.id } }">
 
-            <p class="text-gray-800 font-medium truncate">
-              {{ item.book.title }}
-            </p>
-          </router-link>
+              <p class="text-gray-800 font-medium truncate">
+                {{ item.book.title }}
+              </p>
+            </router-link>
             <p class="text-gray-500 text-sm">
               {{ item.book.author || "Không rõ tác giả" }}
             </p>
-        </li>
-      </ul>
-
-      <div class="mt-4 text-center">
-        <router-link :to="{ name: 'view_all_to_read_book' }"
-          class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm shadow">
-          Xem tất cả
-        </router-link>
+          </li>
+        </ul>
       </div>
     </div>
 
+    <!-- 5. Thêm v-if vào nút "Xem tất cả" -->
+    <div v-if="!loading && !errorMessage && books.length > 0" class="mt-4 text-center">
+      <router-link :to="{ name: 'view_all_to_read_book' }"
+        class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm shadow">
+        Xem tất cả
+      </router-link>
+    </div>
   </div>
 </template>

@@ -62,7 +62,7 @@ async function getReview(userId: number, bookId: number) {
     } else {
       console.error("Lỗi khi tải review:", error);
     }
-  } 
+  }
 }
 
 
@@ -83,7 +83,7 @@ async function addReview(userId: number, bookId: number, rating: number, content
     console.error("Có lỗi khi thêm bình luận:", error);
 
     throw error;
-  } 
+  }
 }
 
 
@@ -125,7 +125,7 @@ async function submitReview() {
     await getReview(userInfo.value.user_id, bookId);
   } catch (error) {
     alert("Không thể gửi đánh giá, vui lòng thử lại sau.");
-  } 
+  }
 }
 
 

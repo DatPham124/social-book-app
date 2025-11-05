@@ -1,35 +1,46 @@
 <script setup>
 import Navbar from "../components/layout/Navbar.vue"
-import CurentlyReadingBooks from "../components/books/CurentlyReadingBooks.vue"
-import Read from "../components/books/Read.vue";
-import ToReadPile from "../components/books/ToReadPile.vue";
+import CurentlyReadingBooks from "../components/profile/CurentlyReadingBooks.vue"
+import Read from "../components/profile/Read.vue";
+import ToReadPile from "../components/profile/ToReadPile.vue";
+import DidNotFinish from "../components/profile/DidNotFinish.vue";
 import ProfileHeader from "../components/profile/ProfileHeader.vue";
-import {useRoute} from "vue-router"
+import ProfileReviews from "../components/profile/ProfileReviews.vue"; // <-- 1. IMPORT LẠI
+import { useRoute } from "vue-router"
 
 const route = useRoute()
-
 const userID = route.params.id;
+
 </script>
 
 <template>
-
     <Navbar />
 
-    <div class="w-full max-w-5xl mx-auto">
-        <ProfileHeader :userID = "userID"/>
+    <div class="w-full max-w-5xl mx-auto p-4 md:p-6">
+        <ProfileHeader :userID="userID" class="mb-6" />
 
-        <div class="grid grid-cols-[2fr_1fr] gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6">
+            
+            <div class="space-y-8">
+                <div>
+                    <CurentlyReadingBooks />
+                </div>
+                <div>
+                    <Read />
+                </div>
+            </div>
+            
+            <div class="space-y-6">
+                
+                <ProfileReviews :userID="userID" />
+                
+                <DidNotFinish />
 
-
-            <CurentlyReadingBooks class="h-[325px] flex items-center justify-center" />
-
-            <div class="bg-white p-6 rounded-lg shadow border">
+                <div>
+                    <ToReadPile />
+                </div>
 
             </div>
-
-            <Read class="h-[325px] flex items-center justify-center" />
-
-            <ToReadPile class="h-[325px]" />
         </div>
     </div>
 </template>

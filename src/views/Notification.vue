@@ -5,18 +5,18 @@ import Navbar from "../components/layout/Navbar.vue";
 import { AVATAR_SERVER_URL, USER_SERVICE_URL, BOOK_SERVICE_URL } from "../config";
 import { getProfile } from "../composables/useProfile";
 import { useAuth } from "../composables/useAuth";
+import { useBooks } from "../composables/useBook"; // <-- 1. IMPORT useBooks
 import axios from "axios";
 
 const { userInfo } = useAuth();
+const { getBookById } = useBooks(); // <-- 2. LẤY HÀM getBookById
 
 const notifyList = ref<any[]>([]);
-const info_sender = ref<any[]>([]); // (Giữ lại, nhưng logic mới sẽ không dùng)
 const dangTai = ref(true);
 const loi = ref<string | null>(null);
 
 function dinhDangThoiGian(thoiGianStr: string) {
-  const diffMs = Date.now() - new Date(thoiGianStr).getTime();
-  const phut = Math.floor(diffMs / 60000);
+  const diffMs = Date.now() - new Date(thoiGianStr + "Z").getTime(); const phut = Math.floor(diffMs / 60000);
   if (phut < 1) return "vừa xong";
   if (phut < 60) return `${phut} phút trước`;
   const gio = Math.floor(phut / 60);
@@ -33,40 +33,30 @@ async function rejectFriendRequest(tb: any) {
     await axios.delete(`${USER_SERVICE_URL}friends/delete/${tb.message}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    // Xóa thông báo khỏi user-service
     await deleteNotification(tb.id);
   } catch (err: any) {
     console.error("Lỗi khi từ chối lời mời:", err);
     alert("Không thể từ chối lời mời. Vui lòng thử lại sau.");
   }
 }
-
 async function acceptFriendRequest(friendId: number) {
   try {
-    const response = await axios.put(
+    await axios.put(
       `${USER_SERVICE_URL}friends/update/${friendId}?status=accepted`,
       {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
+      { headers: { Authorization: `Bearer ${token}` } }
     );
     const index = notifyList.value.findIndex(
       (tb) => tb.message == String(friendId) && tb.type === 'friend_request'
     );
     if (index !== -1) {
-      if (notifyList.value[index].friend_record?.[0]) {
-        notifyList.value[index].friend_record[0].status = "accepted";
-      }
-      // Đánh dấu đã chấp nhận ở frontend
       notifyList.value[index].status = 'accepted';
     }
-    console.log("Chấp nhận lời mời kết bạn thành công:", response.data);
   } catch (err: any) {
     console.error("Lỗi khi chấp nhận lời mời:", err);
     loi.value = err.message || "Có lỗi xảy ra khi chấp nhận kết bạn";
   }
 }
-
 async function checkFriendStatus(friendId?: number) {
   if (!token || !userInfo || !friendId) return null;
   try {
@@ -80,76 +70,94 @@ async function checkFriendStatus(friendId?: number) {
   }
 }
 
-// --- HÀM MỚI CHO BOOK CLUB (THEO LOGIC ĐƠN GIẢN) ---
+// (Các hàm Book Club giữ nguyên)
 async function getClub(clubId: number) {
   try {
     const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${clubId}`);
     return res.data;
   } catch (error) {
-    console.error("Lỗi khi lấy thông tin câu lạc bộ:", error);
     return null;
   }
 }
-
 async function acceptBookClubInvite(invitationId: number) {
   try {
-    // 1. Gọi API "Accept" mới của book-service
     await axios.post(
       `${BOOK_SERVICE_URL}bookclubs/invitations/${invitationId}/accept`
     );
-
-    // 2. Cập nhật UI: Xóa lời mời khỏi danh sách
-    notifyList.value = notifyList.value.filter(n => !(n.id === invitationId && n.type === 'bookclub_invite'));
+    notifyList.value = notifyList.value.filter(n => n.id !== invitationId || n.type !== 'bookclub_invite');
   } catch (err: any) {
-    console.error("Lỗi khi chấp nhận lời mời club:", err);
     loi.value = err.response?.data?.detail || "Lỗi khi tham gia club";
   }
 }
-
 async function rejectBookClubInvite(invitationId: number) {
   try {
-    // 1. Gọi API "Decline" mới của book-service
     await axios.delete(
       `${BOOK_SERVICE_URL}bookclubs/invitations/${invitationId}/decline`
     );
-
-    // 2. Cập nhật UI: Xóa lời mời khỏi danh sách
-    notifyList.value = notifyList.value.filter(n => !(n.id === invitationId && n.type === 'bookclub_invite'));
+    notifyList.value = notifyList.value.filter(n => n.id !== invitationId || n.type !== 'bookclub_invite');
   } catch (err) {
     console.error("Lỗi khi từ chối lời mời club:", err);
   }
 }
 
+// 3. THÊM CÁC HÀM MỚI CHO BUDDY READ
+async function acceptBuddyReadInvite(invitationId: number) {
+  try {
+    // Gọi API (Bước 2, Route 3)
+    await axios.post(
+      `${BOOK_SERVICE_URL}buddyreads/invitations/${invitationId}/accept`
+    );
+    // Xóa khỏi danh sách
+    notifyList.value = notifyList.value.filter(n => n.id !== invitationId || n.type !== 'buddy_read_invite');
+  } catch (err: any) {
+    loi.value = err.response?.data?.detail || "Lỗi khi chấp nhận";
+  }
+}
+async function rejectBuddyReadInvite(invitationId: number) {
+  try {
+    // Gọi API (Bước 2, Route 4)
+    await axios.delete(
+      `${BOOK_SERVICE_URL}buddyreads/invitations/${invitationId}/decline`
+    );
+    // Xóa khỏi danh sách
+    notifyList.value = notifyList.value.filter(n => n.id !== invitationId || n.type !== 'buddy_read_invite');
+  } catch (err) {
+    console.error("Lỗi khi từ chối lời mời:", err);
+  }
+}
+// ---
+
 async function deleteNotification(notificationId: number) {
-  // Hàm này chỉ dùng để xóa thông báo KẾT BẠN
+  // (Giữ nguyên)
   try {
     await axios.delete(`${USER_SERVICE_URL}notifications/${notificationId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    notifyList.value = notifyList.value.filter(n => !(n.id === notificationId && n.type === 'friend_request'));
+    notifyList.value = notifyList.value.filter(n => n.id !== notificationId);
   } catch (err) {
     console.error("Lỗi khi xóa thông báo:", err);
   }
 }
-// --- KẾT THÚC HÀM MỚI ---
 
-
-// --- VIẾT LẠI HÀM LOADNOTIFY ---
+// 4. SỬA LẠI HÀM LOADNOTIFY (THÊM API THỨ 3)
 async function loadNotify(userId: number) {
   try {
-    // 1. Tạo 2 promise để gọi 2 service cùng lúc
+    // 1. Tạo 3 promise
     const friendNotifyPromise = axios.get(`${USER_SERVICE_URL}notifications/user/${userId}`);
     const clubInvitePromise = axios.get(`${BOOK_SERVICE_URL}bookclubs/invitations/${userId}`);
+    const buddyReadInvitePromise = axios.get(`${BOOK_SERVICE_URL}buddyreads/invitations/${userId}`); // <-- API MỚI
 
-    const [friendNotifyRes, clubInviteRes] = await Promise.all([
+    const [friendNotifyRes, clubInviteRes, buddyReadInviteRes] = await Promise.all([
       friendNotifyPromise,
-      clubInvitePromise
+      clubInvitePromise,
+      buddyReadInvitePromise
     ]);
 
     const friendRequests = friendNotifyRes.data;
     const clubInvites = clubInviteRes.data;
+    const buddyReadInvites = buddyReadInviteRes.data; // <-- Dữ liệu mới
 
-    // 2. Xử lý lời mời kết bạn (Logic cũ)
+    // 2. Xử lý lời mời kết bạn
     const processedFriendRequests = await Promise.all(
       friendRequests.map(async (item: any) => {
         const senderProfile = await getProfile(item.sender_id);
@@ -167,23 +175,42 @@ async function loadNotify(userId: number) {
       })
     );
 
-    // 3. Xử lý lời mời vào CLB (Logic mới)
+    // 3. Xử lý lời mời vào CLB
     const processedClubInvites = await Promise.all(
       clubInvites.map(async (item: any) => {
         const senderProfile = await getProfile(item.sender_id);
         const clubInfo = await getClub(item.club_id);
         return {
           ...item,
-          type: 'bookclub_invite', // Gán type thủ công
+          type: 'bookclub_invite',
           info_sender: senderProfile,
           club_name: clubInfo?.name || "Một câu lạc bộ",
-          // status: 'pending' (đã có sẵn từ item)
         };
       })
     );
 
-    // 4. Gộp 2 danh sách và sắp xếp theo ngày
-    const allNotifications = [...processedFriendRequests, ...processedClubInvites];
+    // 4. Xử lý lời mời Đọc Cùng Bạn
+    const processedBuddyReadInvites = await Promise.all(
+      buddyReadInvites.map(async (item: any) => {
+        const senderProfile = await getProfile(item.sender_id);
+        // Lấy sách từ buddy_read_id -> book_id
+        const readRes = await axios.get(`${BOOK_SERVICE_URL}buddyreads/${item.buddy_read_id}`);
+        const book = await getBookById(readRes.data.book_id);
+        return {
+          ...item,
+          type: 'buddy_read_invite',
+          info_sender: senderProfile,
+          book_title: book?.title || "Một cuốn sách",
+        };
+      })
+    );
+
+    // 5. Gộp 3 danh sách và sắp xếp
+    const allNotifications = [
+      ...processedFriendRequests,
+      ...processedClubInvites,
+      ...processedBuddyReadInvites // <-- Thêm vào
+    ];
     allNotifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     notifyList.value = allNotifications;
@@ -224,7 +251,7 @@ onMounted(async () => {
 
       <h2 class="text-lg font-semibold text-gray-800 mb-4">Mới nhất</h2>
 
-      <div v-for="tb in notifyList" :key="`${tb.type}-${tb.id}`"
+      <div v-for="tb in notifyList" :key="tb.id"
         class="flex items-start gap-4 bg-white p-5 mb-4 border rounded-lg shadow-sm hover:shadow-md transition">
         <div
           class="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-lg font-bold text-gray-600 overflow-hidden">
@@ -252,11 +279,17 @@ onMounted(async () => {
             <span v-if="tb.type === 'friend_request'">
               đã gửi lời mời kết bạn
             </span>
-            
+
             <!-- Lời mời vào CLB -->
             <span v-else-if="tb.type === 'bookclub_invite'">
               đã mời bạn tham gia câu lạc bộ
               <span class="font-semibold text-yellow-600">{{ tb.club_name || '' }}</span>
+            </span>
+
+            <!-- 5. THÊM HIỂN THỊ LỜI MỜI ĐỌC CHUNG -->
+            <span v-else-if="tb.type === 'buddy_read_invite'">
+              đã mời bạn đọc chung cuốn
+              <span class="font-semibold text-yellow-600">{{ tb.book_title || '' }}</span>
             </span>
           </p>
 
@@ -265,7 +298,6 @@ onMounted(async () => {
           </p>
 
           <!-- Nút bấm cho Lời mời kết bạn -->
-          <!-- SỬA LỖI TYPO: vt-if -> v-if -->
           <div v-if="tb.type === 'friend_request'">
             <div class="mt-3 flex gap-3" v-if="tb.status === 'pending'">
               <button class="px-4 py-1 border border-teal-600 text-teal-600 font-semibold rounded-md
@@ -273,7 +305,6 @@ onMounted(async () => {
                 @click="acceptFriendRequest(tb.friend_record[0].id)">
                 Chấp nhận
               </button>
-
               <button class="px-4 py-1 border border-gray-300 text-gray-800 font-semibold rounded-md
                 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-colors duration-200"
                 @click="rejectFriendRequest(tb)">
@@ -282,9 +313,6 @@ onMounted(async () => {
             </div>
             <p v-else-if="tb.status === 'accepted'" class="text-green-600 font-semibold mt-2">
               Đã chấp nhận lời mời
-            </p>
-            <p v-else-if="!tb.friend_record" class="text-gray-500 mt-2">
-              Lời mời không còn hợp lệ
             </p>
           </div>
 
@@ -296,7 +324,6 @@ onMounted(async () => {
                 @click="acceptBookClubInvite(tb.id)">
                 Chấp nhận
               </button>
-
               <button class="px-4 py-1 border border-gray-300 text-gray-800 font-semibold rounded-md
                 hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-colors duration-200"
                 @click="rejectBookClubInvite(tb.id)">
@@ -305,8 +332,23 @@ onMounted(async () => {
             </div>
           </div>
 
-        </div>
+          <!-- 6. THÊM NÚT BẤM CHO LỜI MỜI ĐỌC CHUNG -->
+          <div v-else-if="tb.type === 'buddy_read_invite'">
+            <div class="mt-3 flex gap-3" v-if="tb.status === 'pending'">
+              <button class="px-4 py-1 border border-teal-600 text-teal-600 font-semibold rounded-md
+                hover:bg-teal-600 hover:text-white transition-colors duration-200"
+                @click="acceptBuddyReadInvite(tb.id)">
+                Chấp nhận
+              </button>
+              <button class="px-4 py-1 border border-gray-300 text-gray-800 font-semibold rounded-md
+                hover:bg-rose-500 hover:text-white hover:border-rose-500 transition-colors duration-200"
+                @click="rejectBuddyReadInvite(tb.id)">
+                Từ chối
+              </button>
+            </div>
+          </div>
 
+        </div>
       </div>
 
       <div v-if="notifyList.length === 0 && !loi" class="text-center text-gray-500 py-10">
@@ -315,4 +357,3 @@ onMounted(async () => {
     </div>
   </div>
 </template>
-

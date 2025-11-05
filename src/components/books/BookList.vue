@@ -127,7 +127,6 @@ onMounted(fetchBooks);
 
     <div v-else>
       <div v-for="(book, index) in books" :key="book.id" class="flex border rounded-xl shadow-sm mb-6 bg-white">
-        <!-- Ảnh bìa -->
         <div class="w-32 h-52 flex-shrink-0">
           <router-link :to="{ name: 'book', params: { id: book.id } }" class="w-32 h-52 flex-shrink-0 block">
             <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" :alt="book.title"

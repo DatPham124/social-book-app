@@ -10,40 +10,23 @@ import { BOOK_SERVICE_URL, BOOKCLUB_IMAGE_SERVER_URL, USER_SERVICE_URL, AVATAR_S
 import { getProfile } from "../../../composables/useProfile";
 import { useAuth } from "../../../composables/useAuth";
 
-interface SearchUser {
-  id: number;
-  username: string;
-}
-interface Club {
-  id: number;
-  name: string;
-  avatar_url?: string;
-  creator_name: string;
-  description?: string;
-  rules?: string;
-  creator_id?: number;
-}
-interface Meeting {
-  id: number;
-  title: string;
-  date: string;
-  status: "upcoming" | "past";
-}
-interface Member {
-  user_id: number;
-  role: string;
-  username: string;
-  avatar_url?: string;
-}
+interface SearchUser { id: number; username: string; }
+interface Club { id: number; name: string; avatar_url?: string; creator_name: string; description?: string; rules?: string; creator_id?: number; is_public?: boolean; }
+interface Meeting { id: number; title: string; date: string; status: "upcoming" | "past"; }
+interface Member { user_id: number; role: string; username: string; avatar_url?: string; }
+interface Discussion { id: number; title: string; content: string; user_id: number; created_at: string; user?: { username: string }; comment_count: number; }
 
-interface Discussion {
+interface JoinRequest {
   id: number;
-  title: string;
-  content: string;
-  user_id: number;
-  created_at: string;
-  user?: { username: string };
-  comment_count: number;
+  club_id: number;
+  sender_id: number;
+  status: string;
+  type: string;
+  sender_profile?: {
+    user_id: number;
+    username: string;
+    avatar_url?: string;
+  }
 }
 
 const route = useRoute();
@@ -53,7 +36,7 @@ const { userInfo } = useAuth();
 
 const club = ref<Club | null>(null);
 const meetings = ref<Meeting[]>([]);
-const activeTab = ref("upcoming"); // <-- Trả về 'upcoming'
+const activeTab = ref("upcoming");
 const showAddMeeting = ref(false);
 
 const showMenu = ref(false);
@@ -70,6 +53,9 @@ const membersList = ref<Member[]>([]);
 const discussionsList = ref<Discussion[]>([]);
 const showDiscussionForm = ref(false);
 const isLoadingDiscussions = ref(false);
+
+const joinRequests = ref<JoinRequest[]>([]);
+const isLoadingRequests = ref(false);
 
 const isCreator = computed(() => {
   if (!userInfo.value || !club.value) return false;
@@ -202,14 +188,14 @@ async function getDiscussions(clubId: number) {
   isLoadingDiscussions.value = true;
   try {
     const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${clubId}/discussions`);
-
     const discussionsWithData = await Promise.all(
       res.data.map(async (discussion: Discussion) => {
         const profile = await getProfile(discussion.user_id);
-
+        const comment_count = 0; // Tạm thời
         return {
           ...discussion,
           user: { username: profile?.username || "Người dùng ẩn" },
+          comment_count: comment_count
         };
       })
     );
@@ -226,7 +212,56 @@ function handleDiscussionCreated() {
   getDiscussions(clubId);
 }
 
+async function getJoinRequests(clubId: number) {
+  if (!isCreator.value) return [];
 
+  const userId = userInfo.value?.id || userInfo.value?.user_id;
+  if (!userId) return [];
+
+  isLoadingRequests.value = true;
+  try {
+    const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${clubId}/join-requests?user_id=${userId}`);
+
+    const requestsWithProfile = await Promise.all(
+      res.data.map(async (req: JoinRequest) => {
+        const profile = await getProfile(req.sender_id);
+        return { ...req, sender_profile: profile };
+      })
+    );
+    return requestsWithProfile;
+  } catch (error) {
+    console.error("Lỗi khi lấy yêu cầu tham gia:", error);
+    return [];
+  } finally {
+    isLoadingRequests.value = false;
+  }
+}
+
+async function handleJoinRequest(requestId: number, action: 'accept' | 'decline') {
+  const userId = userInfo.value?.id || userInfo.value?.user_id;
+  if (!userId) {
+    alert("Lỗi xác thực Host");
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append("user_id", String(userId));
+
+    if (action === 'accept') {
+      await axios.post(`${BOOK_SERVICE_URL}bookclubs/request/${requestId}/accept`, formData);
+    } else {
+      await axios.delete(`${BOOK_SERVICE_URL}bookclubs/request/${requestId}/decline`, {
+        data: formData
+      });
+    }
+    joinRequests.value = joinRequests.value.filter(req => req.id !== requestId);
+    getMembers(clubId).then(data => membersList.value = data);
+    getMemberCount(clubId).then(data => memberCount.value = data.member_count);
+  } catch (err: any) {
+    alert(`Lỗi khi ${action === 'accept' ? 'chấp thuận' : 'từ chối'}: ${err.response?.data?.detail}`);
+  }
+}
 
 async function joinClub() {
   const userId = userInfo.value?.id || userInfo.value?.user_id;
@@ -237,19 +272,21 @@ async function joinClub() {
   try {
     const formData = new FormData();
     formData.append("user_id", String(userId));
-    // Gọi API POST /.../join (backend bạn đã có)
-    await axios.post(`${BOOK_SERVICE_URL}bookclubs/${clubId}/join`, formData);
+    const res = await axios.post(`${BOOK_SERVICE_URL}bookclubs/${clubId}/join`, formData);
 
-    // Tải lại dữ liệu thành viên để cập nhật nút bấm và số lượng
-    await Promise.all([getMemberCount(clubId), getMembers(clubId)]).then(([countData, memberData]) => {
-      memberCount.value = countData?.member_count || 0;
-      membersList.value = memberData || [];
-    });
+    if (club.value && !club.value.is_public) {
+      alert("Đã gửi yêu cầu tham gia. Vui lòng chờ chủ club duyệt.");
+    } else {
+      alert("Tham gia thành công!");
+      await Promise.all([getMemberCount(clubId), getMembers(clubId)]).then(([countData, memberData]) => {
+        memberCount.value = countData?.member_count || 0;
+        membersList.value = memberData || [];
+      });
+    }
   } catch (err: any) {
     alert(err.response?.data?.detail || "Lỗi khi tham gia");
   }
 }
-
 async function leaveClub() {
   const userId = userInfo.value?.id || userInfo.value?.user_id;
   if (!userId) {
@@ -261,7 +298,6 @@ async function leaveClub() {
   try {
     const formData = new FormData();
     formData.append("user_id", String(userId));
-
     await axios.delete(`${BOOK_SERVICE_URL}bookclubs/${clubId}/leave`, {
       data: formData
     });
@@ -284,12 +320,20 @@ async function loadData() {
     return;
   }
 
-  const [meetingData, memberCountData, memberListData, discussionData] = await Promise.all([
+  const currentUserId = userInfo.value?.id || userInfo.value?.user_id;
+
+  const promises = [
     getMeetings(clubId),
     getMemberCount(clubId),
     getMembers(clubId),
     getDiscussions(clubId)
-  ]);
+  ];
+
+  if (club.value && currentUserId === club.value.creator_id) {
+    promises.push(getJoinRequests(clubId));
+  }
+
+  const [meetingData, memberCountData, memberListData, discussionData, requestData] = await Promise.all(promises);
 
   const now = new Date();
   meetings.value = (meetingData || []).map((m: any) => ({
@@ -298,6 +342,7 @@ async function loadData() {
   }));
   memberCount.value = memberCountData?.member_count || 0;
   membersList.value = memberListData || [];
+  joinRequests.value = requestData || [];
 }
 
 onMounted(() => {
@@ -356,17 +401,15 @@ onMounted(() => {
 
           <button v-if="!isCreator && !isMember" @click="joinClub"
             class="mt-3 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black text-sm font-semibold rounded-md shadow-sm">
-            Tham gia câu lạc bộ
+            {{ club.is_public ? 'Tham gia câu lạc bộ' : 'Gửi yêu cầu tham gia' }}
           </button>
 
         </div>
       </div>
 
-      <!-- SỬA LẠI TABS (XÓA KHỐI LẶP) -->
-      <div v-if="isMember" class="flex space-x-6 mt-4 border-b border-gray-200">
+      <div v-if="isMember" class="flex flex-wrap space-x-6 mt-4 border-b border-gray-200">
         <button v-for="tab in [
-          { key: 'upcoming', label: 'Cuộc họp sắp tới' },
-          { key: 'past', label: 'Cuộc họp đã qua' },
+          { key: 'upcoming', label: 'Cuộc họp' },
           { key: 'discussions', label: 'Thảo luận' },
           { key: 'members', label: 'Thành viên' },
           { key: 'about', label: 'Giới thiệu' },
@@ -379,7 +422,7 @@ onMounted(() => {
           {{ tab.label }}
         </button>
       </div>
-      <div v-else class="flex space-x-6 mt-4 border-b border-gray-200">
+      <div v-else class="flex flex-wrap space-x-6 mt-4 border-b border-gray-200">
         <button v-for="tab in [
           { key: 'about', label: 'Giới thiệu' },
           { key: 'rules', label: 'Nội quy' },
@@ -393,7 +436,6 @@ onMounted(() => {
         </button>
       </div>
 
-      <!-- NỘI DUNG TABS -->
       <div class="mt-6">
         <div v-if="activeTab === 'upcoming' && isMember">
           <div v-if="showAddMeeting">
@@ -462,11 +504,9 @@ onMounted(() => {
         </div>
 
         <div v-else-if="activeTab === 'discussions' && isMember">
-
           <div v-if="showDiscussionForm">
             <DiscussionForm :club-id="clubId" @created="handleDiscussionCreated" @cancel="showDiscussionForm = false" />
           </div>
-
           <div v-else>
             <div v-if="isCreator" class="flex justify-end mb-4">
               <button @click="showDiscussionForm = true"
@@ -474,11 +514,9 @@ onMounted(() => {
                 + Tạo thảo luận mới
               </button>
             </div>
-
             <div v-if="isLoadingDiscussions" class="text-center py-10 text-gray-500">
               Đang tải thảo luận...
             </div>
-
             <div v-else-if="discussionsList.length === 0"
               class="text-center py-16 text-gray-500 bg-gray-50 rounded-lg border">
               <span class="text-6xl">💬</span>
@@ -487,7 +525,6 @@ onMounted(() => {
                 {{ isCreator ? 'Hãy tạo một chủ đề để mọi người cùng trao đổi!' : 'Chưa có chủ đề nào được tạo.' }}
               </p>
             </div>
-
             <div v-else class="space-y-4">
               <router-link v-for="post in discussionsList" :key="post.id" :to="'/discussion/' + post.id"
                 class="block p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition">
@@ -514,9 +551,7 @@ onMounted(() => {
             <input v-model="searchQuery" @input="searchUsers" type="text"
               class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-yellow-400 focus:outline-none"
               placeholder="Tìm theo username..." />
-
             <div v-if="isSearching" class="text-gray-500 text-center py-3">Đang tìm...</div>
-
             <ul v-if="searchResults.length > 0" class="mt-4 max-h-60 overflow-y-auto space-y-2">
               <li v-for="user in searchResults" :key="user.id"
                 class="flex justify-between items-center p-2 border rounded-md bg-white hover:bg-gray-100">
@@ -530,12 +565,42 @@ onMounted(() => {
             <p v-if="inviteMessage" class="text-sm text-green-600 mt-3">{{ inviteMessage }}</p>
           </div>
 
+          <div v-if="isCreator && joinRequests.length > 0" class="mb-8">
+            <h3 class="text-lg font-semibold text-yellow-600 mb-3">
+              Yêu cầu đang chờ duyệt ({{ joinRequests.length }})
+            </h3>
+            <div class="space-y-3">
+              <div v-for="req in joinRequests" :key="req.id"
+                class="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
+                <div class="flex items-center gap-3">
+                  <div
+                    class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-700 overflow-hidden shadow-sm">
+                    <img v-if="req.sender_profile?.avatar_url"
+                      :src="`${AVATAR_SERVER_URL}/${req.sender_profile.avatar_url}`"
+                      class="w-full h-full object-cover rounded-full" />
+                    <span v-else class="text-lg">{{ req.sender_profile?.username.charAt(0).toUpperCase() }}</span>
+                  </div>
+                  <span class="font-semibold text-gray-800">{{ req.sender_profile?.username }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <button @click="handleJoinRequest(req.id, 'accept')"
+                    class="px-3 py-1 bg-yellow-400 hover:bg-yellow-500 text-black text-sm font-semibold rounded-md">
+                    Chấp thuận
+                  </button>
+                  <button @click="handleJoinRequest(req.id, 'decline')"
+                    class="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-md">
+                    Từ chối
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div>
             <h3 class="text-lg font-semibold text-yellow-600 mb-3">
               Tất cả thành viên ({{ memberCount }})
             </h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-
               <router-link v-for="member in membersList" :key="member.user_id" :to="'/profile/' + member.user_id"
                 class="flex items-center gap-3 p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                 <div
@@ -558,7 +623,6 @@ onMounted(() => {
                   </span>
                 </div>
               </router-link>
-
             </div>
           </div>
         </div>
@@ -570,7 +634,6 @@ onMounted(() => {
             </p>
           </div>
         </div>
-
         <div v-else-if="activeTab === 'rules'">
           <div v-if="rulesList.length > 0" class="bg-gray-50 p-4 sm:p-6 rounded-lg border">
             <ol class="list-decimal list-outside pl-5 space-y-2 text-gray-800 leading-relaxed">
@@ -586,5 +649,5 @@ onMounted(() => {
       </div>
     </div>
   </div>
-  
+
 </template>
