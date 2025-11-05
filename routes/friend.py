@@ -11,7 +11,6 @@ router = APIRouter(
 )
 
 
-
 @router.post("/add")
 def add_friend(
     friend_id: int,
@@ -59,12 +58,17 @@ def add_friend(
     return new_notification
 
 @router.get("/{user_id}/{status}", response_model=list[Friends])
-def get_all_friends_by_userID_and_status(status: str, session: Session = Depends(get_session_user_service), current_user: User = Depends(get_current_active_user)):
-    user_id = current_user.id
+def get_all_friends_by_userID_and_status(
+    user_id: int,  
+    status: str, 
+    session: Session = Depends(get_session_user_service), 
+    current_user: User = Depends(get_current_active_user)
+):
+    user_id_from_token = current_user.id 
     
     statement = select(Friends).where(or_(
-        Friends.user_id == user_id,
-        Friends.friend_id == user_id
+        Friends.user_id == user_id_from_token,
+        Friends.friend_id == user_id_from_token
     ),
     Friends.status == status
     )
@@ -73,7 +77,7 @@ def get_all_friends_by_userID_and_status(status: str, session: Session = Depends
     if not friends:
         raise HTTPException(
             status_code=404,
-            detail=f"No friends found for user with id {user_id}"
+            detail=f"No friends found for user with id {user_id_from_token}"
         )
 
     return friends
