@@ -49,7 +49,7 @@ class UserBookStatus(SQLModel, table=True):
     )
     start_date: Optional[date] = None 
     finish_date: Optional[date] = None
-    updated_at: date = Field(default_factory=date.today)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     is_favorite: bool = Field(default=False, nullable=False)
     
 class ReadingProgress(SQLModel, table=True):
@@ -139,3 +139,55 @@ class BookClubInvitation(SQLModel, table=True):
         sa_column=Column(SqlEnum(InviteStatus))
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    type: Optional[str] = Field(default="invite", description="invite | request")
+
+
+class BuddyRead(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    book_id: int = Field(index=True, foreign_key="books.id")
+    created_by_user_id: int = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Thêm Relationship
+    members: List["BuddyReadMember"] = Relationship(back_populates="buddy_read")
+    comments: List["BuddyReadComment"] = Relationship(back_populates="buddy_read")
+    invitations: List["BuddyReadInvitation"] = Relationship(back_populates="buddy_read")
+
+class BuddyReadMember(SQLModel, table=True):
+    # Thêm UniqueConstraint
+    __table_args__ = (UniqueConstraint("buddy_read_id", "user_id"),)
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    buddy_read_id: int = Field(index=True, foreign_key="buddyread.id")
+    user_id: int = Field(index=True)
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Thêm Relationship
+    buddy_read: Optional["BuddyRead"] = Relationship(back_populates="members")
+
+class BuddyReadComment(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    buddy_read_id: int = Field(index=True, foreign_key="buddyread.id")
+    user_id: int = Field(index=True)
+    content: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Thêm Relationship
+    buddy_read: Optional["BuddyRead"] = Relationship(back_populates="comments")
+
+class BuddyReadInvitation(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    buddy_read_id: int = Field(index=True, foreign_key="buddyread.id")
+    sender_id: int = Field(index=True)
+    receiver_id: int = Field(index=True)
+    status: InviteStatus = Field(
+        default=InviteStatus.PENDING, 
+        sa_column=Column(SqlEnum(InviteStatus))
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Thêm Relationship
+    buddy_read: Optional["BuddyRead"] = Relationship(back_populates="invitations")
+

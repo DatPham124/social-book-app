@@ -1,6 +1,9 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List, Optional
+from sqlalchemy import extract, func
 from sqlmodel import Session, and_, or_, select
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Query
+
 from ..model import BookStatus, Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink
 from common_lib.database import get_session_book_service
 
@@ -164,11 +167,6 @@ def get_book_by_status_and_userID(
     )
     results = session.exec(statement).all()
 
-    if not results:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Không tìm thấy sách với trạng thái '{status}' cho user_id={user_id}"
-        )
 
     return results
 
@@ -184,7 +182,6 @@ def update_user_book_status(
     if status not in valid_status:
         raise HTTPException(status_code=400, detail="Trạng thái không hợp lệ")
 
-    # Kiểm tra xem bản ghi có tồn tại chưa
     statement = select(UserBookStatus).where(
         and_(
             UserBookStatus.book_id == book_id,
@@ -199,15 +196,15 @@ def update_user_book_status(
             book_id=book_id,
             status=status
         )
-        session.add(book_status)
     else:
         book_status.status = status
-        session.add(book_status)
-
+        book_status.updated_at = datetime.utcnow()
+    
+    session.add(book_status)
     session.commit()
     session.refresh(book_status)
-
     return {"message": "✅ Book status updated", "status": book_status.status}
+
 
 @router.get("/explore/{user_id}")
 def get_explore_books(
@@ -269,7 +266,6 @@ def get_reading_progress(
     progress = session.exec(statement).first()
     
     if not progress:
-        # Nếu chưa có tiến độ, trả về mặc định
         book = session.get(Books, book_id)
         return {
             "user_id": user_id,
@@ -288,12 +284,10 @@ def update_reading_progress(
     session: Session = Depends(get_session_book_service)
 ):
     
-       # Lấy sách từ DB
     book = session.get(Books, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     
-    # Kiểm tra số trang
     if current_page_from_user > book.page_count:
         raise HTTPException(status_code=400, detail="Số trang vượt quá số trang thực tế")
 
@@ -330,14 +324,7 @@ def get_book_status(user_id: int, book_id: int, session: Session = Depends(get_s
     ).first()
 
     if not status:
-        status = UserBookStatus(
-            user_id=user_id,
-            book_id=book_id,
-            status=BookStatus.to_read
-        )
-        session.add(status)
-        session.commit()
-        session.refresh(status)
+        return None 
 
     return status
 
@@ -358,4 +345,50 @@ def delete_book_status(user_id: int, book_id: int, session: Session = Depends(ge
 
     return {"message": "Xóa trạng thái thành công"}
 
+
+@router.get("/stats/counts/{user_id}")
+def get_user_read_counts(
+    user_id: int,
+    session: Session = Depends(get_session_book_service)
+):
+    
+    total_read_stmt = (
+        select(func.count(UserBookStatus.id))
+        .where(
+            UserBookStatus.user_id == user_id,
+            UserBookStatus.status == BookStatus.read
+        )
+    )
+    total_read = session.exec(total_read_stmt).one_or_none() or 0
+
+    current_year = datetime.utcnow().year
+    year_read_stmt = (
+        select(func.count(UserBookStatus.id))
+        .where(
+            UserBookStatus.user_id == user_id,
+            UserBookStatus.status == BookStatus.read,
+            extract('year', UserBookStatus.updated_at) == current_year
+        )
+    )
+    read_this_year = session.exec(year_read_stmt).one_or_none() or 0
+
+    return {
+        "total_read": total_read,
+        "read_this_year": read_this_year
+    }
+
+
+@router.get("/feed/recent-status", response_model=List[UserBookStatus])
+def get_recent_status_feed(
+    session: Session = Depends(get_session_book_service),
+    limit: int = 50 
+):
+    statement = (
+        select(UserBookStatus)
+        .where(UserBookStatus.status.in_([BookStatus.read, BookStatus.currently_reading]))
+        .order_by(UserBookStatus.updated_at.desc())
+        .limit(limit)
+    )
+    activities = session.exec(statement).all()
+    return activities
 
