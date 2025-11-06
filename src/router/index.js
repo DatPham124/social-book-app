@@ -27,6 +27,9 @@ import DiscussionDetail from "../components/community/BookClub/DiscussionDetail.
 
 import BuddyReadDetail from "../components/community/BuddyRead/BuddyReadDetail.vue";
 
+
+import StatisticsTab from "../views/StatisticsTab.vue";
+
 const routes = [
   { path: "/login", name: "Login", component: Login },
   { path: "/home", name: "Home", component: Home },
@@ -114,6 +117,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
 
+  {
+    path: "/stats/:id",
+    name: "StatisticsTab",
+    component: StatisticsTab,
+  },
+
   { path: "/", redirect: "/login" },
 ];
 
@@ -123,3 +132,4 @@ const router = createRouter({
 });
 
 export default router;
+

@@ -48,7 +48,7 @@ async function get_profile_by_user() {
 
 onMounted(async () => {
     await get_profile_by_user()
-    }
+}
 )
 </script>
 
@@ -62,6 +62,9 @@ onMounted(async () => {
                     <h1 class="text-2xl font-logo text-yellow-500 item-center">📚 Social Book</h1>
                     <div class="hidden md:flex space-x-6 items-center">
                         <router-link to="/home" class="text-gray-700 hover:text-yellow-500">Trang chủ</router-link>
+                        <router-link :to="{ name: 'StatisticsTab', params: { id: userInfo?.user_id } }"
+                            class="text-gray-700 hover:text-yellow-500">Thống kê
+                        </router-link>
                         <router-link to="/community" class="text-gray-700 hover:text-yellow-500">Cộng đồng</router-link>
                         <router-link to="/friends" class="text-gray-700 hover:text-yellow-500">Bạn bè</router-link>
                     </div>
@@ -95,13 +98,13 @@ onMounted(async () => {
                                     <strong class="font-medium">{{ userInfo.username }}</strong>
                                 </div>
                                 <MenuItem v-slot="{ active }">
-                                <router-link :to="{name: 'profile', params: {id: userInfo.user_id}}"
+                                <router-link :to="{ name: 'profile', params: { id: userInfo.user_id } }"
                                     :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
                                     Hồ sơ của bạn
                                 </router-link>
                                 </MenuItem>
                                 <MenuItem v-slot="{ active }">
-                                <router-link :to="{name: 'Notification'}"
+                                <router-link :to="{ name: 'Notification' }"
                                     :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
                                     Thông báo
                                 </router-link>

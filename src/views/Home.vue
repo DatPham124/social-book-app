@@ -170,25 +170,7 @@ onMounted(() => {
       </button>
 
       <div v-show="isOpen" class="border-t border-gray-200 p-4 space-y-6">
-        
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Type (MỚI - Đơn giản)</label>
-          <div class="flex gap-4">
-            <label class="flex items-center text-sm">
-              <input type="radio" value="Fiction" v-model="filters.book_type" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
-              <span class="ml-2 text-gray-700">Hư cấu (Fiction)</span>
-            </label>
-            <label class="flex items-center text-sm">
-              <input type="radio" value="Nonfiction" v-model="filters.book_type" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
-              <span class="ml-2 text-gray-700">Phi hư cấu (Nonfiction)</span>
-            </label>
-            <label class="flex items-center text-sm">
-              <input type="radio" :value="null" v-model="filters.book_type" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
-              <span class="ml-2 text-gray-700">Tất cả</span>
-            </label>
-          </div>
-        </div>
-
+  
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Thể loại</label>
           <div class="max-h-40 overflow-y-auto border rounded-md p-2 grid grid-cols-2 md:grid-cols-3 gap-2">

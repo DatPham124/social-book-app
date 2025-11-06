@@ -82,8 +82,8 @@ onMounted(() => {
 <template>
   <Navbar />
 
-  <div class="w-full max-w-5xl mx-auto mt-10 px-4">
-    <h2 class="text-2xl font-logo text-yellow-400 mb-6">Cộng đồng</h2>
+  <div class="w-full max-w-5xl mx-auto m-5 space-y-6 px-4">
+    <h1 class="text-2xl font-logo text-yellow-400 item-center">Cộng đồng</h1>
 
     <div class="flex flex-wrap gap-6 border-b border-gray-300">
       <button v-for="tab in tabs" :key="tab.value" @click="selectTab(tab.value)"
