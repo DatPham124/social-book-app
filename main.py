@@ -1,6 +1,6 @@
 from fastapi import Depends, FastAPI
 from common_lib.database import  engine_book_service
-from .routes import books, author, category, bookclub, buddyread, filter
+from .routes import books, author, category, bookclub, buddyread, filter, stats
 from sqlmodel import SQLModel
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
@@ -45,4 +45,5 @@ app.include_router(category.router)
 app.include_router(bookclub.router)
 app.include_router(buddyread.router)
 app.include_router(filter.router)
+app.include_router(stats.router)
 
