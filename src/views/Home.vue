@@ -6,40 +6,51 @@ import axios from 'axios';
 import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL, AVATAR_SERVER_URL } from '../config';
 import { useAuth } from '../composables/useAuth';
 import { getProfile } from '../composables/useProfile';
-import { useBooks } from '../composables/useBook'; // <-- 1. SỬA LỖI IMPORT (thành 'useBook')
+import { useBooks } from '../composables/useBook';
 import BookStatusSelect from '../components/books/BookStatusSelect.vue'; 
+
+interface Category {
+  id: number;
+  name: string;
+}
 
 const { userInfo } = useAuth();
 const router = useRouter();
-const { getUserBookStatus } = useBooks(); // <-- 2. SỬA LỖI (dùng useBooks())
+const { getUserBookStatus } = useBooks();
 
-// === State ===
-const isOpen = ref(false);
+const isOpen = ref(true);
 const loading = ref(true);
 const results = ref<any[]>([]);
 const error = ref<string | null>(null);
 const hasFiltered = ref(false);
+const allCategories = ref<Category[]>([]); 
 
 const filters = ref({
-  genres_include: "",
-  genres_exclude: "",
-  page_min: null as number | null,
-  page_max: null as number | null,
+  genres_include: [] as string[],
+  genres_exclude: [] as string[],
+  page_filter: null as string | null,
   year_min: null as number | null,
   year_max: null as number | null,
+  book_type: null as string | null,
   user_id_to_exclude_books: true,
 });
 
-// 3. SỬA MAP (thêm 'add_book' cho trạng thái rỗng)
 const statusMap = {
-  add_book: "Thêm vào kệ", // <-- Trạng thái mới
+  add_book: "Thêm vào kệ",
   to_read: "Sẽ đọc",
   currently_reading: "Đang đọc",
   read: "Đã đọc",
   dnf: "Chưa hoàn thành",
 };
 
-// === API Functions ===
+async function loadCategories() {
+  try {
+    const res = await axios.get(`${BOOK_SERVICE_URL}category/`);
+    allCategories.value = res.data;
+  } catch (err) {
+    console.error("Không thể tải danh sách thể loại");
+  }
+}
 
 async function fetchBookDetails(books: any[]) {
   const userId = userInfo.value?.id || userInfo.value?.user_id;
@@ -48,12 +59,10 @@ async function fetchBookDetails(books: any[]) {
     books.map(async (book: any) => {
       const [profile, statusResult] = await Promise.all([
         getProfile(book.authorID), 
-        // 4. API (đã sửa ở backend) giờ trả về NULL nếu không tìm thấy
         userId ? getUserBookStatus(userId, book.id) : null 
       ]);
       
-      // 5. Logic xử lý NULL
-      const statusKey = statusResult?.status || 'add_book'; // <-- Nếu NULL, dùng 'add_book'
+      const statusKey = statusResult?.status || 'add_book';
       const statusObject = {
         value: statusKey,
         label: statusMap[statusKey as keyof typeof statusMap] || "Thêm vào kệ"
@@ -62,7 +71,7 @@ async function fetchBookDetails(books: any[]) {
       return { 
         ...book, 
         authorName: profile?.username || "Không rõ tác giả",
-        statusObject: statusObject, // Gán object
+        statusObject: statusObject,
         categories: book.categories || []
       };
     })
@@ -97,13 +106,28 @@ async function applyFilters() {
   error.value = null;
   const userId = userInfo.value?.id || userInfo.value?.user_id;
 
+  let page_min: number | null = null;
+  let page_max: number | null = null;
+
+  if (filters.value.page_filter === 'lt300') {
+    page_min = 0;
+    page_max = 299;
+  } else if (filters.value.page_filter === '300-499') {
+    page_min = 300;
+    page_max = 499;
+  } else if (filters.value.page_filter === 'gt500') {
+    page_min = 500;
+    page_max = null;
+  }
+
   const payload = {
-    genres_include: filters.value.genres_include.split(',').map(s => s.trim()).filter(Boolean),
-    genres_exclude: filters.value.genres_exclude.split(',').map(s => s.trim()).filter(Boolean),
-    page_min: filters.value.page_min,
-    page_max: filters.value.page_max,
+    genres_include: filters.value.genres_include,
+    genres_exclude: filters.value.genres_exclude,
+    page_min: page_min,
+    page_max: page_max,
     year_min: filters.value.year_min,
     year_max: filters.value.year_max,
+    book_type: filters.value.book_type,
     user_id_to_exclude_books: filters.value.user_id_to_exclude_books ? userId : null,
   };
 
@@ -122,7 +146,10 @@ function goToBook(bookId: number) {
   router.push(`/book/${bookId}`);
 }
 
-onMounted(loadInitialExplore);
+onMounted(() => {
+  loadInitialExplore();
+  loadCategories();
+});
 </script>
 
 <template>
@@ -131,79 +158,111 @@ onMounted(loadInitialExplore);
   <div class="w-full max-w-5xl mx-auto m-5 space-y-6 px-4">
     <h1 class="text-2xl font-logo text-yellow-400 item-center">Khám phá</h1>
 
-    <!-- (Bộ lọc giữ nguyên) -->
     <div class="bg-white border border-gray-200 rounded-lg shadow-sm ">
       <button @click="isOpen = !isOpen"
         class="focus:outline-none focus:ring-2 focus:ring-yellow-400 w-full flex items-center justify-start p-4 text-left focus:outline-none">
         <svg class="w-5 h-5 text-gray-600 transition-transform duration-300 ease-in-out"
-          :class="{ 'rotate-90': isOpen }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+          :class="{ 'rotate-0': isOpen, '-rotate-90': !isOpen }" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
           stroke-width="2" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
         </svg>
-        <span class="ml-3 font-medium text-gray-800">Tùy chọn lọc</span>
+        <span class="ml-3 font-medium text-gray-800">Lọc tất cả sách</span>
       </button>
 
-      <Transition enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0"
-        enter-active-class="transition ease-out duration-200" leave-from-class="opacity-100 translate-y-0"
-        leave-to-class="opacity-0 -translate-y-2" leave-active-class="transition ease-in duration-150">
-        <div v-show="isOpen" class="border-t border-gray-200 p-4">
-          <!-- (Nội dung bộ lọc giữ nguyên) -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-600 mb-1">Thể loại (Bao gồm)</label>
-              <input v-model="filters.genres_include" type="text"
-                class="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:outline-none" 
-                placeholder="fantasy, sci-fi" />
-              <p class="text-xs text-gray-400 mt-1">Cách nhau bằng dấu phẩy (,)</p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-600 mb-1">Thể loại (Loại trừ)</label>
-              <input v-model="filters.genres_exclude" type="text"
-                class="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:outline-none" 
-                placeholder="romance" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-600 mb-1">Số trang (Tối thiểu)</label>
-              <input v-model.number="filters.page_min" type="number"
-                class="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:outline-none" 
-                placeholder="300" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-600 mb-1">Số trang (Tối đa)</label>
-              <input v-model.number="filters.page_max" type="number"
-                class="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:outline-none" 
-                placeholder="500" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-600 mb-1">Năm xuất bản (Từ)</label>
-              <input v-model.number="filters.year_min" type="number"
-                class="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:outline-none" 
-                placeholder="1990" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-600 mb-1">Năm xuất bản (Đến)</label>
-              <input v-model.number="filters.year_max" type="number"
-                class="w-full border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:outline-none" 
-                placeholder="2000" />
-            </div>
-          </div>
-          <div class="mt-4">
-            <label class="inline-flex items-center">
-              <input type="checkbox" v-model="filters.user_id_to_exclude_books" 
-                class="form-checkbox h-4 w-4 text-yellow-500 border-gray-300 rounded focus:ring-yellow-400">
-              <span class="ml-2 text-gray-700">Loại bỏ sách đã có trên kệ</span>
+      <div v-show="isOpen" class="border-t border-gray-200 p-4 space-y-6">
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Type (MỚI - Đơn giản)</label>
+          <div class="flex gap-4">
+            <label class="flex items-center text-sm">
+              <input type="radio" value="Fiction" v-model="filters.book_type" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
+              <span class="ml-2 text-gray-700">Hư cấu (Fiction)</span>
+            </label>
+            <label class="flex items-center text-sm">
+              <input type="radio" value="Nonfiction" v-model="filters.book_type" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
+              <span class="ml-2 text-gray-700">Phi hư cấu (Nonfiction)</span>
+            </label>
+            <label class="flex items-center text-sm">
+              <input type="radio" :value="null" v-model="filters.book_type" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
+              <span class="ml-2 text-gray-700">Tất cả</span>
             </label>
           </div>
-          <div class="flex justify-end mt-4">
-            <button
-              @click="applyFilters"
-              class="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded-md"
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Thể loại</label>
+          <div class="max-h-40 overflow-y-auto border rounded-md p-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+            <label 
+              v-for="category in allCategories" 
+              :key="category.id" 
+              class="flex items-center text-sm cursor-pointer"
             >
-              Lọc kết quả
-            </button>
+              <input 
+                type="checkbox"
+                :value="category.name"
+                v-model="filters.genres_include"
+                class="form-checkbox h-4 w-4 text-yellow-500 rounded focus:ring-yellow-400"
+              />
+              <span class="ml-2 text-gray-700">{{ category.name }}</span>
+            </label>
           </div>
         </div>
-      </Transition>
+        
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Số trang</label>
+          <div class="flex flex-wrap gap-4">
+            <label class="flex items-center text-sm">
+              <input type="radio" value="lt300" v-model="filters.page_filter" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
+              <span class="ml-2 text-gray-700">&lt; 300</span>
+            </label>
+            <label class="flex items-center text-sm">
+              <input type="radio" value="300-499" v-model="filters.page_filter" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
+              <span class="ml-2 text-gray-700">300-499</span>
+            </label>
+            <label class="flex items-center text-sm">
+              <input type="radio" value="gt500" v-model="filters.page_filter" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
+              <span class="ml-2 text-gray-700">500+</span>
+            </label>
+            <label class="flex items-center text-sm">
+              <input type="radio" :value="null" v-model="filters.page_filter" class="form-radio h-4 w-4 text-yellow-500 focus:ring-yellow-400">
+              <span class="ml-2 text-gray-700">Tất cả</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Năm xuất bản</label>
+          <div class="flex items-center gap-3">
+            <input vd-model.number="filters.year_min" type="number"
+              class="w-full md:w-32 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:outline-none" 
+              placeholder="Từ (VD: 1990)" />
+            <span class="text-gray-500">-</span>
+            <input v-model.number="filters.year_max" type="number"
+              class="w-full md:w-32 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:outline-none" 
+              placeholder="Đến (VD: 2000)" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Chỉ hiển thị sách</label>
+          <div class="space-y-1">
+            <label class="flex items-center text-sm">
+              <input type="checkbox" v-model="filters.user_id_to_exclude_books" 
+                class="form-checkbox h-4 w-4 text-yellow-500 border-gray-300 rounded focus:ring-yellow-400">
+              <span class="ml-2 text-gray-700">Chưa có trên kệ của tôi</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-end mt-4">
+          <button
+            @click="applyFilters"
+            class="px-5 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded-md"
+          >
+            Lọc
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Kết quả -->
@@ -230,7 +289,6 @@ onMounted(loadInitialExplore);
           :key="book.id"
           class="flex flex-col md:flex-row gap-5 bg-white p-4 rounded-lg border shadow-sm"
         >
-          <!-- Bìa sách -->
           <img 
             v-if="book.cover_url"
             :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`"
@@ -242,7 +300,6 @@ onMounted(loadInitialExplore);
             📚
           </div>
           
-          <!-- Thông tin sách (Giữa) -->
           <div class="flex-1">
             <h3 
               @click="goToBook(book.id)"
@@ -270,7 +327,6 @@ onMounted(loadInitialExplore);
             </div>
           </div>
           
-          <!-- Nút trạng thái (Phải) -->
           <div class="w-full md:w-40 flex-shrink-0">
             <BookStatusSelect 
               v-if="userInfo?.id || userInfo?.user_id"
@@ -289,4 +345,3 @@ onMounted(loadInitialExplore);
     
   </div>
 </template>
-
