@@ -1,9 +1,11 @@
 <script lang="ts" setup>
 import { onMounted, ref } from "vue"
+import { useRouter } from "vue-router";
 import { jwtDecode } from "jwt-decode"
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import { AVATAR_SERVER_URL, USER_SERVICE_URL } from '../../config'
 import axios from "axios"
+
 interface TokenPayLoad {
     username: string
     roles: number[]
@@ -32,9 +34,24 @@ const signOut = () => {
     window.location.href = '/login';
 }
 
+
+const router = useRouter();
+const searchQuery = ref("");
+
+function handleSearch() {
+    if (searchQuery.value.trim()) {
+        router.push({
+            name: 'Search',
+            query: { q: searchQuery.value }
+        });
+        searchQuery.value = "";
+    }
+}
+
 const profile = ref<any>(null)
 
 async function get_profile_by_user() {
+    if (!token) return;
     try {
         const res = await axios.get(`${USER_SERVICE_URL}users/profile`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -47,9 +64,11 @@ async function get_profile_by_user() {
 
 
 onMounted(async () => {
-    await get_profile_by_user()
-}
-)
+    // Chỉ gọi API nếu người dùng đã đăng nhập
+    if (userInfo) {
+        await get_profile_by_user();
+    }
+})
 </script>
 
 
@@ -60,20 +79,23 @@ onMounted(async () => {
             <div class="flex justify-between h-16 items-center mx-10">
                 <div class="flex space-x-8 item-center">
                     <h1 class="text-2xl font-logo text-yellow-500 item-center">📚 Social Book</h1>
-                    <div class="hidden md:flex space-x-6 items-center">
+
+                    <div v-if="userInfo" class="hidden md:flex space-x-6 items-center">
                         <router-link to="/home" class="text-gray-700 hover:text-yellow-500">Trang chủ</router-link>
-                        <router-link :to="{ name: 'StatisticsTab', params: { id: userInfo?.user_id } }"
+                        <router-link :to="{ name: 'StatisticsTab', params: { id: userInfo.user_id } }"
                             class="text-gray-700 hover:text-yellow-500">Thống kê
                         </router-link>
                         <router-link to="/community" class="text-gray-700 hover:text-yellow-500">Cộng đồng</router-link>
                         <router-link to="/friends" class="text-gray-700 hover:text-yellow-500">Bạn bè</router-link>
                     </div>
+
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
                             <font-awesome-icon icon="fa-solid fa-magnifying-glass" />
                         </span>
-                        <input type="text" placeholder="Tìm kiếm sách, bạn bè..."
-                            class="pl-10 border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full">
+
+                        <input type="text" placeholder="Tìm kiếm sách, bạn bè..." class="pl-10 border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full"
+                            v-model="searchQuery" @keydown.enter="handleSearch">
                     </div>
                 </div>
 
@@ -82,8 +104,18 @@ onMounted(async () => {
                         <MenuButton
                             class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
                             <span class="sr-only">Open user menu</span>
-                            <img :src="`${AVATAR_SERVER_URL}/${profile?.avatar_url}`" alt="avatar"
-                                class="w-10 h-10 rounded-full border border-gray-300">
+
+                            <img v-if="profile && profile.avatar_url"
+                                :src="`${AVATAR_SERVER_URL}/${profile.avatar_url}`" alt="avatar"
+                                class="w-10 h-10 rounded-full border border-gray-300 object-cover">
+
+                            <div v-else
+                                class="w-10 h-10 rounded-full border border-gray-300 bg-yellow-400 flex items-center justify-center">
+                                <span class="text-xl font-semibold text-white">
+                                    {{ userInfo.username?.charAt(0).toUpperCase() }}
+                                </span>
+                            </div>
+
                         </MenuButton>
 
                         <transition enter-active-class="transition ease-out duration-100"

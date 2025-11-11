@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import Navbar from "../../layout/Navbar.vue";
 import AddMeeting from "../BookClub/AddMeeting.vue";
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed }
+  from "vue";
 import BookClubForm from "../BookClub/BookClubForm.vue";
 import DiscussionForm from "../BookClub/DiscussionForm.vue";
 import { useRoute, useRouter } from "vue-router";
@@ -15,7 +16,6 @@ interface Club { id: number; name: string; avatar_url?: string; creator_name: st
 interface Meeting { id: number; title: string; date: string; status: "upcoming" | "past"; }
 interface Member { user_id: number; role: string; username: string; avatar_url?: string; }
 interface Discussion { id: number; title: string; content: string; user_id: number; created_at: string; user?: { username: string }; comment_count: number; }
-
 interface JoinRequest {
   id: number;
   club_id: number;
@@ -37,6 +37,7 @@ const { userInfo } = useAuth();
 const club = ref<Club | null>(null);
 const meetings = ref<Meeting[]>([]);
 const activeTab = ref("upcoming");
+const defaultTab = ref("about");
 const showAddMeeting = ref(false);
 
 const showMenu = ref(false);
@@ -191,7 +192,7 @@ async function getDiscussions(clubId: number) {
     const discussionsWithData = await Promise.all(
       res.data.map(async (discussion: Discussion) => {
         const profile = await getProfile(discussion.user_id);
-        const comment_count = 0; // Tạm thời
+        const comment_count = 0; 
         return {
           ...discussion,
           user: { username: profile?.username || "Người dùng ẩn" },
@@ -213,8 +214,6 @@ function handleDiscussionCreated() {
 }
 
 async function getJoinRequests(clubId: number) {
-  if (!isCreator.value) return [];
-
   const userId = userInfo.value?.id || userInfo.value?.user_id;
   if (!userId) return [];
 
@@ -319,21 +318,17 @@ async function loadData() {
   } else {
     return;
   }
-
-  const currentUserId = userInfo.value?.id || userInfo.value?.user_id;
-
-  const promises = [
+  
+  const [meetingData, memberCountData, memberListData] = await Promise.all([
     getMeetings(clubId),
     getMemberCount(clubId),
     getMembers(clubId),
-    getDiscussions(clubId)
-  ];
+    getDiscussions(clubId),
+  ]);
 
-  if (club.value && currentUserId === club.value.creator_id) {
-    promises.push(getJoinRequests(clubId));
+  if (isCreator.value) {
+    joinRequests.value = (await getJoinRequests(clubId)) || [];
   }
-
-  const [meetingData, memberCountData, memberListData, discussionData, requestData] = await Promise.all(promises);
 
   const now = new Date();
   meetings.value = (meetingData || []).map((m: any) => ({
@@ -342,7 +337,6 @@ async function loadData() {
   }));
   memberCount.value = memberCountData?.member_count || 0;
   membersList.value = memberListData || [];
-  joinRequests.value = requestData || [];
 }
 
 onMounted(() => {
@@ -357,10 +351,17 @@ onMounted(() => {
     Đang tải thông tin câu lạc bộ...
   </div>
 
-  <div v-else class="max-w-5xl mx-auto mt-8 bg-white shadow rounded-xl p-6">
-    <BookClubForm v-if="showEdit" :club-id="clubId" @saved="handleEditSaved" @cancel="handleEditCancel" />
+  <div v-else class="max-w-5xl mx-auto mt-8">
+    <BookClubForm 
+      v-if="showEdit" 
+      :club-id="clubId" 
+      @saved="handleEditSaved" 
+      @cancel="handleEditCancel" 
+      class="bg-white shadow rounded-xl p-6"
+    />
 
-    <div v-else>
+    <div v-else class="bg-white shadow rounded-xl p-6">
+      
       <div class="flex items-start gap-6 border-b pb-4 relative">
         <img v-if="club.avatar_url" :src="`${BOOKCLUB_IMAGE_SERVER_URL}/${club.avatar_url}`" alt="Avatar CLB"
           class="w-24 h-24 object-cover rounded-md border border-gray-300 shadow-sm" />
@@ -403,10 +404,9 @@ onMounted(() => {
             class="mt-3 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black text-sm font-semibold rounded-md shadow-sm">
             {{ club.is_public ? 'Tham gia câu lạc bộ' : 'Gửi yêu cầu tham gia' }}
           </button>
-
         </div>
       </div>
-
+      
       <div v-if="isMember" class="flex flex-wrap space-x-6 mt-4 border-b border-gray-200">
         <button v-for="tab in [
           { key: 'upcoming', label: 'Cuộc họp' },
@@ -427,8 +427,8 @@ onMounted(() => {
           { key: 'about', label: 'Giới thiệu' },
           { key: 'rules', label: 'Nội quy' },
           { key: 'members', label: 'Thành viên' },
-        ]" :key="tab.key" @click="activeTab = tab.key" class="py-2 text-sm font-medium transition-colors border-b-2"
-          :class="activeTab === tab.key
+        ]" :key="tab.key" @click="defaultTab = tab.key" class="py-2 text-sm font-medium transition-colors border-b-2"
+          :class="defaultTab === tab.key
             ? 'text-yellow-600 border-yellow-400'
             : 'text-gray-500 border-transparent hover:text-gray-700'
             ">
@@ -436,8 +436,8 @@ onMounted(() => {
         </button>
       </div>
 
-      <div class="mt-6">
-        <div v-if="activeTab === 'upcoming' && isMember">
+      <div v-if="isMember" class="mt-6">
+        <div v-if="activeTab === 'upcoming'">
           <div v-if="showAddMeeting">
             <AddMeeting :club-id="clubId" @created="handleMeetingCreated" @cancel="showAddMeeting = false" />
           </div>
@@ -477,33 +477,8 @@ onMounted(() => {
             </div>
           </div>
         </div>
-
-        <div v-else-if="activeTab === 'past' && isMember">
-          <div v-if="meetings.filter(m => m.status === 'past').length === 0" class="text-center text-gray-500 py-10">
-            <p>Chưa có cuộc họp nào trước đây.</p>
-          </div>
-          <div v-else>
-            <div v-for="meeting in meetings.filter(m => m.status === 'past')" :key="meeting.id"
-              class="p-4 my-4 border rounded-lg flex justify-between items-center hover:bg-gray-50 transition">
-              <div>
-                <p class="font-semibold text-gray-800">{{ meeting.title }}</p>
-                <p class="text-sm text-gray-500">
-                  Ngày: {{ new Date(meeting.date).toLocaleDateString('vi-VN') }},
-                  Giờ:
-                  {{
-                    new Date(meeting.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-                  }}
-                </p>
-              </div>
-              <button @click="goToMeeting(meeting.id)"
-                class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-100">
-                Xem lại
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div v-else-if="activeTab === 'discussions' && isMember">
+        
+        <div v-else-if="activeTab === 'discussions'">
           <div v-if="showDiscussionForm">
             <DiscussionForm :club-id="clubId" @created="handleDiscussionCreated" @cancel="showDiscussionForm = false" />
           </div>
@@ -545,7 +520,6 @@ onMounted(() => {
         </div>
 
         <div v-else-if="activeTab === 'members'">
-
           <div v-if="isCreator" class="mb-8 p-4 bg-gray-50 rounded-lg border">
             <h3 class="text-lg font-semibold text-yellow-600 mb-3">Mời thành viên</h3>
             <input v-model="searchQuery" @input="searchUsers" type="text"
@@ -647,7 +621,60 @@ onMounted(() => {
           </div>
         </div>
       </div>
+      
+      <div v-else class="mt-6">
+        <div v-if="defaultTab === 'about'">
+          <div class="bg-gray-50 p-4 sm:p-5 rounded-lg border">
+            <p class="whitespace-pre-line leading-relaxed text-gray-800">
+              {{ club.description || "Chưa có mô tả cho câu lạc bộ này." }}
+            </p>
+          </div>
+        </div>
+        <div v-else-if="defaultTab === 'rules'">
+          <div v-if="rulesList.length > 0" class="bg-gray-50 p-4 sm:p-6 rounded-lg border">
+            <ol class="list-decimal list-outside pl-5 space-y-2 text-gray-800 leading-relaxed">
+              <li v-for="(rule, index) in rulesList" :key="index">
+                {{ rule }}
+              </li>
+            </ol>
+          </div>
+          <div v-else class="text-center text-gray-500 py-10 italic">
+            <p>Chưa có nội quy cho câu lạc bộ này.</p>
+          </div>
+        </div>
+        <div v-else-if="defaultTab === 'members'">
+          <div>
+            <h3 class="text-lg font-semibold text-yellow-600 mb-3">
+              Tất cả thành viên ({{ memberCount }})
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <router-link v-for="member in membersList" :key="member.user_id" :to="'/profile/' + member.user_id"
+                class="flex items-center gap-3 p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                <div
+                  class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-700 overflow-hidden shadow-sm flex-shrink-0">
+                  <template v-if="member.avatar_url">
+                    <img :src="`${AVATAR_SERVER_URL}/${member.avatar_url}`" alt="Avatar"
+                      class="w-full h-full object-cover" />
+                  </template>
+                  <template v-else>
+                    {{ member.username?.charAt(0)?.toUpperCase() || "U" }}
+                  </template>
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-800 hover:text-yellow-700">{{ member.username }}</p>
+                  <span v-if="member.role === 'host'" class="text-xs text-yellow-600 font-medium">
+                    Người quản lý
+                  </span>
+                  <span v-else class="text-xs text-gray-500">
+                    Thành viên
+                  </span>
+                </div>
+              </router-link>
+            </div>
+          </div>
+        </div>
+      </div>
+      
     </div>
   </div>
-
 </template>

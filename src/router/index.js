@@ -30,6 +30,9 @@ import BuddyReadDetail from "../components/community/BuddyRead/BuddyReadDetail.v
 
 import StatisticsTab from "../views/StatisticsTab.vue";
 
+
+import SearchView from "../views/SearchView.vue";
+
 const routes = [
   { path: "/login", name: "Login", component: Login },
   { path: "/home", name: "Home", component: Home },
@@ -121,6 +124,12 @@ const routes = [
     path: "/stats/:id",
     name: "StatisticsTab",
     component: StatisticsTab,
+  },
+
+  {
+    path: "/search",
+    name: "Search",
+    component: SearchView,
   },
 
   { path: "/", redirect: "/login" },

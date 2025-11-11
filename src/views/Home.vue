@@ -16,9 +16,9 @@ interface Category {
 
 const { userInfo } = useAuth();
 const router = useRouter();
-const { getUserBookStatus } = useBooks();
+const { getUserBookStatus, getAuthor } = useBooks();
 
-const isOpen = ref(true);
+const isOpen = ref(false);
 const loading = ref(true);
 const results = ref<any[]>([]);
 const error = ref<string | null>(null);
@@ -58,7 +58,7 @@ async function fetchBookDetails(books: any[]) {
   const booksWithDetails = await Promise.all(
     books.map(async (book: any) => {
       const [profile, statusResult] = await Promise.all([
-        getProfile(book.authorID), 
+        getAuthor(book.authorID), 
         userId ? getUserBookStatus(userId, book.id) : null 
       ]);
       
@@ -70,7 +70,7 @@ async function fetchBookDetails(books: any[]) {
       
       return { 
         ...book, 
-        authorName: profile?.username || "Không rõ tác giả",
+        authorName: profile?.name || "Không rõ tác giả",
         statusObject: statusObject,
         categories: book.categories || []
       };
@@ -149,6 +149,7 @@ function goToBook(bookId: number) {
 onMounted(() => {
   loadInitialExplore();
   loadCategories();
+
 });
 </script>
 

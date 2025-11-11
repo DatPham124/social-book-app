@@ -66,6 +66,9 @@ async function getRecentlyReadBooks() {
     );
 
     books.value = detailedBooks.filter((b) => b.book !== null);
+    if (books.value.length === 0) {
+      errorMessage.value = "Bạn chưa có sách nào trong mục Đã đọc";
+    }
   } catch (error: any) {
     loading.value = false
     if (axios.isAxiosError(error) && error.response) {
@@ -108,8 +111,8 @@ onMounted(() => {
             class="w-20 h-28 shadow rounded overflow-hidden bg-gray-100 flex">
 
             <router-link :to="{ name: 'book', params: { id: item.book.id } }">
-              <img :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`"
-                :alt="item.book.title" class="h-full w-full object-cover" />
+              <img :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`" :alt="item.book.title"
+                class="h-full w-full object-cover" />
             </router-link>
 
           </div>

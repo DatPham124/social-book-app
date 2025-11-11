@@ -57,6 +57,10 @@ async function getCurrentlyReadingBooks() {
     );
 
     books.value = detailedBooks.filter((b) => b.book !== null); // loại bỏ null
+
+    if (books.value.length === 0) {
+      errorMessage.value = "Bạn chưa có sách nào trong mục Đang đọc.";
+    }
   } catch (error: any) {
     if (axios.isAxiosError(error) && error.response) {
       if (error.response.status === 404) {
@@ -101,7 +105,7 @@ onMounted(async () => {
 
               <img v-if="item.book.cover_url" :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`"
                 :alt="item.book.title" class="h-full w-full object-cover" />
-            
+
             </router-link>
 
           </div>
