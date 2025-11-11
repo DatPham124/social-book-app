@@ -1,16 +1,35 @@
-from typing import List, Optional
-from sqlalchemy import extract, func
-from sqlmodel import Session, and_, or_, select
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List, Optional, Any
+from sqlalchemy import extract, func, and_
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from sqlmodel import Session, select
+from datetime import datetime, date
+from google import genai
+from google.genai import types
+import os
+from pydantic import BaseModel
+from dotenv import load_dotenv
 
-from ..model import BookStatus, Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink
+from ..model import BookStatus, Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink, Authors
 from common_lib.database import get_session_book_service
+
+
+load_dotenv()
 
 router = APIRouter(
     prefix="/books",
     tags=["books"],
 )
+    
+try:
+    client = genai.Client()
+except Exception as e:
+    print(f"Lỗi khởi tạo Gemini Client (hãy kiểm tra GEMINI_API_KEY): {e}")
+    client = None
+
+class SummaryResponse(BaseModel):
+    summary_text: str
+
+# === BOOK ROUTES ===
 
 @router.get("/search", response_model=list[Books])
 def search_books(
@@ -30,7 +49,7 @@ def search_books(
     if not results:
         return []
     
-    return results
+    return results  
 
 @router.post('/add', response_model=Books)
 def add_book(book: Books, session: Session = Depends(get_session_book_service)):
@@ -46,6 +65,47 @@ def get_all_books(session: Session = Depends(get_session_book_service)):
     books = session.exec(statement).all()
     return books
 
+@router.get('/ai-summary', response_model=SummaryResponse)
+def get_ai_summary(
+    book_title: str,
+    book_author: Optional[str] = None,
+    book_description: Optional[str] = None,
+):
+
+    
+    if not client:
+        raise HTTPException(status_code=500, detail="Dịch vụ AI chưa được cấu hình (thiếu API Key)")
+
+    if book_description:
+        prompt = f"""
+        Đây là cuốn sách: '{book_title}' của '{book_author}'.
+        Đây là mô tả chính thức của nó: '{book_description}'.
+        Nếu bạn không có thông tin chắc chắn về sách dù chỉ 1 ít nghi ngờ, bạn trả về thông báo "Không có thông tin".
+        Dựa trên mô tả này VÀ kiến thức của riêng bạn về cuốn sách, hãy viết một tóm tắt khách quan về nội dung chính trong 3 gạch đầu dòng. Chỉ trả lời tóm tắt, không nói gì thêm.
+        """
+    else:
+        prompt = f"""Hãy tóm tắt cốt truyện chính của cuốn sách tên là '{book_title}' của tác giả '{book_author}' trong 3 gạch đầu dòng. Chỉ trả lời 3 gạch đầu dòng.
+        """
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            config=types.GenerateContentConfig(
+                system_instruction="Bạn là một biên tập viên."),
+            contents=prompt
+        )
+        
+        summary_text = response.text
+        return SummaryResponse(summary_text=summary_text)
+        
+    except Exception as e:
+        print(f"Lỗi khi gọi Gemini: {str(e)}")
+        try:
+            print(f"Gemini response feedback: {response.prompt_feedback}")
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=f"AI không thể tạo tóm tắt: {str(e)}")
+
 
 @router.get("/{book_id}", response_model=Books)
 def get_book_by_id(book_id: int, session: Session = Depends(get_session_book_service)):
@@ -53,14 +113,6 @@ def get_book_by_id(book_id: int, session: Session = Depends(get_session_book_ser
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     
-    # lấy categories
-    stmt = (
-        select(Category)
-        .join(BookCategoryLink, BookCategoryLink.category_id == Category.id)
-        .where(BookCategoryLink.book_id == book.id)
-    )
-    categories = session.exec(stmt).all()
-
     return book
 
 @router.put('/update/{book_id}', response_model=Books)
@@ -91,7 +143,7 @@ def delete_book_by_id(book_id: int, session: Session = Depends(get_session_book_
     session.commit()
     return {"message": f"Book with id {book_id} has been deleted"}
 
-
+# === USER BOOK STATUS ROUTES ===
 @router.get('/status/all', response_model=list[UserBookStatus])
 def get_all_status_books(session: Session = Depends(get_session_book_service)):
     statement = select(UserBookStatus)
@@ -120,7 +172,11 @@ def change_favorite_stage(book_id: int, user_id: int, session: Session = Depends
     user_book = session.exec(statement).first()
     
     if not user_book:
-        raise HTTPException(status_code=404, detail="Không tìm thấy bản ghi cho user và book này")
+        user_book = UserBookStatus(
+            user_id=user_id,
+            book_id=book_id,
+            status=BookStatus.to_read 
+        )
     
     user_book.is_favorite = not user_book.is_favorite
     session.add(user_book)
@@ -166,7 +222,6 @@ def get_book_by_status_and_userID(
         )
     )
     results = session.exec(statement).all()
-
 
     return results
 
@@ -226,7 +281,12 @@ def get_explore_books(
 
     results = []
     for book in books:
-        category_names = [cat.name for cat in book.categories] if book.categories else []
+        category_stmt = (
+            select(Category.name)
+            .join(BookCategoryLink, BookCategoryLink.category_id == Category.id)
+            .where(BookCategoryLink.book_id == book.id)
+        )
+        category_names = session.exec(category_stmt).all()
         
         results.append({
             "id": book.id,
@@ -236,6 +296,7 @@ def get_explore_books(
             "published_date": book.published_date,
             "language": book.language,
             "authorID": book.authorID,
+            "page_count": book.page_count,
             "categories": category_names,  
             "status": "to_read"
         })
@@ -251,7 +312,7 @@ def get_book_categories(book_id: int, session: Session = Depends(get_session_boo
     
     return book.categories
 
-@router.get("/reading-progress/{user_id}/{book_id}")
+@router.get("/reading-progress/{user_id}/{book_id}", response_model=Any)
 def get_reading_progress(
     user_id: int,
     book_id: int,
@@ -276,7 +337,7 @@ def get_reading_progress(
     
     return progress
 
-@router.put("/reading-progress/{user_id}/{book_id}")
+@router.put("/reading-progress/{user_id}/{book_id}", response_model=ReadingProgress)
 def update_reading_progress(
     user_id: int,
     book_id: int,
@@ -288,7 +349,7 @@ def update_reading_progress(
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     
-    if current_page_from_user > book.page_count:
+    if book.page_count and current_page_from_user > book.page_count:
         raise HTTPException(status_code=400, detail="Số trang vượt quá số trang thực tế")
 
     statement = select(ReadingProgress).where(
@@ -314,7 +375,7 @@ def update_reading_progress(
     
     return progress
 
-@router.get("/status/{user_id}/{book_id}")
+@router.get("/status/{user_id}/{book_id}", response_model=Optional[UserBookStatus])
 def get_book_status(user_id: int, book_id: int, session: Session = Depends(get_session_book_service)):
     status = session.exec(
         select(UserBookStatus).where(
@@ -392,3 +453,37 @@ def get_recent_status_feed(
     activities = session.exec(statement).all()
     return activities
 
+class DateUpdateRequest(BaseModel):
+    start_date: Optional[date] = None
+    finish_date: Optional[date] = None
+
+@router.put("/status/dates/{user_id}/{book_id}", response_model=UserBookStatus)
+def update_reading_dates(
+    user_id: int,
+    book_id: int,
+    dates: DateUpdateRequest, 
+    session: Session = Depends(get_session_book_service)
+):
+    
+    statement = select(UserBookStatus).where(
+        UserBookStatus.user_id == user_id,
+        UserBookStatus.book_id == book_id
+    )
+    status_record = session.exec(statement).first()
+
+    if not status_record:
+        status_record = UserBookStatus(
+            user_id=user_id,
+            book_id=book_id,
+            status=BookStatus.to_read 
+        )
+        
+    status_record.start_date = dates.start_date
+    status_record.finish_date = dates.finish_date
+    status_record.updated_at = datetime.utcnow() 
+    
+    session.add(status_record)
+    session.commit()
+    session.refresh(status_record)
+    
+    return status_record

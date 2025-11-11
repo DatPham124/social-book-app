@@ -30,7 +30,7 @@ def get_all(session: Session = Depends(get_session_book_service)):
     return authors
 
 @router.get("/{author_id}", response_model=Authors)
-def get_all(author_id: int, session: Session = Depends(get_session_book_service)):
+def get_author_by_id(author_id: int, session: Session = Depends(get_session_book_service)):
     author =  session.get(Authors, author_id)
 
     if author is None:
@@ -51,7 +51,7 @@ def update_author(author_id: int, author_data: Authors, session: Session = Depen
             detail="author not found"
         )
     
-    author_field = ["name", "bio", "birth_date"]
+    author_field = ["name"]
 
     for field in author_field:
         value = getattr(author_data, field)
