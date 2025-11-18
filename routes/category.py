@@ -2,6 +2,8 @@ from ..model import BookCategoryLink, Books, Category
 from sqlmodel import Session, select
 from fastapi import APIRouter, Depends, HTTPException
 from common_lib.database import get_session_book_service
+from typing import List       # <-- 1. THÊM IMPORT
+from pydantic import BaseModel # <-- 2. THÊM IMPORT
 
 router = APIRouter(
     prefix="/category",
@@ -11,7 +13,6 @@ router = APIRouter(
 # Create
 @router.post("/add", response_model=Category)
 def add_category(category: Category, session: Session = Depends(get_session_book_service)):
-    # kiểm tra tên category đã tồn tại chưa
     existing_category = session.exec(select(Category).where(Category.name == category.name)).first()
     if existing_category:
         raise HTTPException(status_code=400, detail="Category already exists")
@@ -59,7 +60,6 @@ def update_category(category_id: int, category_data: Category, session: Session 
             detail="Category not found"
         )
     
-    # chỉ update field name
     if category_data.name is not None:
         category.name = category_data.name
 
@@ -93,7 +93,6 @@ def add_book_to_category(
     link_data: BookCategoryLink, 
     session: Session = Depends(get_session_book_service)
 ):
-    # 1. Kiểm tra sự tồn tại của Sách và Danh mục
     book_exists = session.get(Books, link_data.book_id)
     category_exists = session.get(Category, link_data.category_id)
 
@@ -108,7 +107,6 @@ def add_book_to_category(
             detail=f"Category with id: {link_data.category_id} not found"
         )
 
-    # 2. Kiểm tra liên kết đã tồn tại chưa
     statement = select(BookCategoryLink).where(
         BookCategoryLink.book_id == link_data.book_id,
         BookCategoryLink.category_id == link_data.category_id
@@ -121,7 +119,6 @@ def add_book_to_category(
             detail="Book is already linked to this category"
         )
 
-    # 3. Tạo và thêm liên kết
     new_link = BookCategoryLink(**link_data.model_dump())
     
     session.add(new_link)
@@ -130,6 +127,49 @@ def add_book_to_category(
 
     return new_link
 
+# 3. TẠO MODEL PYDANTIC ĐỂ NHẬN MỘT DANH SÁCH
+class BookCategoryLinkList(BaseModel):
+    links: List[BookCategoryLink]
+
+# 4. TẠO API ROUTE MỚI ĐỂ THÊM HÀNG LOẠT (BULK)
+@router.post("/book-category-link/add-bulk")
+def add_book_to_category_bulk(
+    link_data: BookCategoryLinkList, # <-- Nhận một danh sách
+    session: Session = Depends(get_session_book_service)
+):
+    links_added = 0
+    links_skipped = 0
+    
+    # Lặp qua từng link trong danh sách
+    for link in link_data.links:
+        # Kiểm tra xem link đã tồn tại chưa
+        existing_link = session.exec(
+            select(BookCategoryLink).where(
+                BookCategoryLink.book_id == link.book_id,
+                BookCategoryLink.category_id == link.category_id
+            )
+        ).first()
+
+        if not existing_link:
+            # Chỉ thêm nếu chưa có
+            new_link = BookCategoryLink(
+                book_id=link.book_id, 
+                category_id=link.category_id
+            )
+            session.add(new_link)
+            links_added += 1
+        else:
+            links_skipped += 1
+    
+    # Commit 1 lần duy nhất ở cuối
+    session.commit()
+    
+    return {
+        "message": "Đã thêm hàng loạt thành công.",
+        "links_added": links_added,
+        "links_skipped_duplicates": links_skipped
+    }
+
 
 @router.delete("/book-category-link/remove")
 def remove_book_from_category(
@@ -137,7 +177,6 @@ def remove_book_from_category(
     category_id: int, 
     session: Session = Depends(get_session_book_service)
 ):
-    # 1. Tìm liên kết
     statement = select(BookCategoryLink).where(
         BookCategoryLink.book_id == book_id,
         BookCategoryLink.category_id == category_id
@@ -150,7 +189,6 @@ def remove_book_from_category(
             detail=f"Link between Book ID {book_id} and Category ID {category_id} not found"
         )
     
-    # 2. Xóa liên kết
     session.delete(link_to_delete)
     session.commit()
 
@@ -162,7 +200,6 @@ def remove_book_from_category(
 @router.get("/book-category-link/", response_model=list[BookCategoryLink])
 def get_all_links(session: Session = Depends(get_session_book_service)):
     links = session.exec(select(BookCategoryLink)).all()
-    # Nếu không muốn trả về [] cho danh sách trống, bạn có thể raise HTTPException 404
     return links
 
 

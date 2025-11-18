@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Optional, List
 from enum import Enum
 from sqlmodel import SQLModel, Field, Relationship
-from sqlalchemy import Column, Enum as SqlEnum, UniqueConstraint
+from sqlalchemy import Column, Enum as SqlEnum, Text, UniqueConstraint
 
 
 class BookCategoryLink(SQLModel, table=True):
@@ -191,3 +191,15 @@ class BuddyReadInvitation(SQLModel, table=True):
     # Thêm Relationship
     buddy_read: Optional["BuddyRead"] = Relationship(back_populates="invitations")
 
+class AiSummaryCache(SQLModel, table=True):
+    book_id: int = Field(primary_key=True, foreign_key="books.id")
+    summary_text: str = Field(sa_column=Column(Text))
+    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    
+class AnnualChallenge(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    year: int = Field(index=True) # Ví dụ: 2025
+    goal_count: int # Mục tiêu (ví dụ: 20 cuốn)
+    created_at: datetime = Field(default_factory=datetime.utcnow)

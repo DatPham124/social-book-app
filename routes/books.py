@@ -1,17 +1,22 @@
 from typing import List, Optional, Any
-from sqlalchemy import extract, func, and_
+from sqlalchemy import extract, func, and_, Text
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from sqlmodel import Session, select
+# 1. IMPORT THÊM 'delete'
+from sqlmodel import Session, select, delete
 from datetime import datetime, date
 from google import genai
 from google.genai import types
 import os
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from pathlib import Path
 
-from ..model import BookStatus, Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink, Authors
+from ..model import (
+    BookStatus, Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink, Authors,
+    AiSummaryCache, BuddyRead, BuddyReadMember, BuddyReadComment, BuddyReadInvitation,
+    BookClubBook
+)
 from common_lib.database import get_session_book_service
-
 
 load_dotenv()
 
@@ -20,11 +25,7 @@ router = APIRouter(
     tags=["books"],
 )
     
-try:
-    client = genai.Client()
-except Exception as e:
-    print(f"Lỗi khởi tạo Gemini Client (hãy kiểm tra GEMINI_API_KEY): {e}")
-    client = None
+client = genai.Client()
 
 class SummaryResponse(BaseModel):
     summary_text: str
@@ -65,37 +66,89 @@ def get_all_books(session: Session = Depends(get_session_book_service)):
     books = session.exec(statement).all()
     return books
 
-@router.get('/ai-summary', response_model=SummaryResponse)
-def get_ai_summary(
-    book_title: str,
-    book_author: Optional[str] = None,
-    book_description: Optional[str] = None,
-):
 
+# (Đảm bảo 'AiSummaryCache', 'Authors', 'Books', 'types' ... đã được import ở đầu file)
+
+@router.get("/{book_id}/ai-summary", response_model=SummaryResponse)
+def get_ai_summary(
+    book_id: int, 
+    session: Session = Depends(get_session_book_service)
+):
     
+    cached_summary = session.get(AiSummaryCache, book_id)
+    if cached_summary:
+        return SummaryResponse(summary_text=cached_summary.summary_text)
+
     if not client:
         raise HTTPException(status_code=500, detail="Dịch vụ AI chưa được cấu hình (thiếu API Key)")
 
+    statement = (
+        select(Books, Authors.name.label("author_name"))
+        .join(Authors, Authors.id == Books.authorID, isouter=True) 
+        .where(Books.id == book_id)
+    )
+    result = session.exec(statement).first()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Không tìm thấy sách")
+
+    book, author_name = result
+    
+    book_title = book.title
+    book_author = author_name or "Không rõ tác giả"
+    book_description = book.description
+    
+    system_instruction = "Bạn là một người viết lời giới thiệu sách chuyên nghiệp (blurb writer), chuyên khơi gợi sự tò mò của người đọc."
+    
+    prompt = ""
     if book_description:
         prompt = f"""
-        Đây là cuốn sách: '{book_title}' của '{book_author}'.
-        Đây là mô tả chính thức của nó: '{book_description}'.
-        Nếu bạn không có thông tin chắc chắn về sách dù chỉ 1 ít nghi ngờ, bạn trả về thông báo "Không có thông tin".
-        Dựa trên mô tả này VÀ kiến thức của riêng bạn về cuốn sách, hãy viết một tóm tắt khách quan về nội dung chính trong 3 gạch đầu dòng. Chỉ trả lời tóm tắt, không nói gì thêm.
+        Dựa trên thông tin sau:
+        Tên sách: '{book_title}'
+        Tác giả: '{book_author}'
+        Mô tả: '{book_description}'
+        
+        Nhiệm vụ: Hãy viết một đoạn tóm tắt (khoảng 2-3 câu) thật lôi cuốn để khiến người đọc ham muốn đọc cuốn sách này.
+        Yêu cầu:
+        1. Không dùng gạch đầu dòng.
+        2. Không tiết lộ (spoil) chi tiết quan trọng của cốt truyện.
+        3. Hãy kết thúc bằng một câu hỏi hoặc một lời hứa hẹn đầy kịch tính để khơi gợi sự tò mò.
         """
     else:
-        prompt = f"""Hãy tóm tắt cốt truyện chính của cuốn sách tên là '{book_title}' của tác giả '{book_author}' trong 3 gạch đầu dòng. Chỉ trả lời 3 gạch đầu dòng.
+        prompt = f"""
+        Bạn có biết về cuốn sách '{book_title}' của tác giả '{book_author}'.
+        
+        Nhiệm vụ: Hãy viết một đoạn tóm tắt (khoảng 2-3 câu) thật lôi cuốn để khiến người đọc ham muốn đọc cuốn sách này.
+        Yêu cầu:
+        1. Không dùng gạch đầu dòng.
+        2. Không tiết lộ (spoil) chi tiết quan trọng của cốt truyện.
+        3. Hãy kết thúc bằng một câu hỏi hoặc một lời hứa hẹn đầy kịch tính để khơi gợi sự tò mò.
         """
 
     try:
+        generate_content_config = types.GenerateContentConfig(
+        temperature=0.5,
+        top_p=0.9,
+        thinking_config = types.ThinkingConfig(
+            thinking_budget=0,
+        ),
+    )
+        
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            config=types.GenerateContentConfig(
-                system_instruction="Bạn là một biên tập viên."),
-            contents=prompt
+            model="gemini-2.5-flash", 
+            config=generate_content_config,
+            contents=[prompt] 
         )
         
-        summary_text = response.text
+        summary_text = response.text.strip() 
+
+        new_cache_entry = AiSummaryCache(
+            book_id=book_id,
+            summary_text=summary_text
+        )
+        session.add(new_cache_entry)
+        session.commit()
+
         return SummaryResponse(summary_text=summary_text)
         
     except Exception as e:
@@ -105,8 +158,22 @@ def get_ai_summary(
         except:
             pass
         raise HTTPException(status_code=500, detail=f"AI không thể tạo tóm tắt: {str(e)}")
-
-
+    
+@router.delete("/{book_id}/ai-summary")
+def delete_ai_summary(
+    book_id: int, 
+    session: Session = Depends(get_session_book_service)
+):    
+    cached_summary = session.get(AiSummaryCache, book_id)
+    
+    if not cached_summary:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tóm tắt (cache) để xóa.")
+    
+    session.delete(cached_summary)
+    session.commit()
+    
+    return {"message": f"Đã xóa tóm tắt AI của sách (ID: {book_id}) thành công."}
+    
 @router.get("/{book_id}", response_model=Books)
 def get_book_by_id(book_id: int, session: Session = Depends(get_session_book_service)):
     book = session.get(Books, book_id)
@@ -130,18 +197,66 @@ def update_book(book_id: int, book_data: Books, session: Session = Depends(get_s
     session.add(book)
     session.commit()
     session.refresh(book)
+    
+    cached_summary = session.get(AiSummaryCache, book_id)
+    if cached_summary:
+        session.delete(cached_summary)
+        session.commit() 
     return book
 
 
 @router.delete('/delete/{book_id}')
 def delete_book_by_id(book_id: int, session: Session = Depends(get_session_book_service)):  
+    
     book = session.get(Books, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail="Book not found")
+        
+    buddy_reads_to_delete = session.exec(
+        select(BuddyRead).where(BuddyRead.book_id == book_id)
+    ).all()
     
+    if buddy_reads_to_delete:
+        buddy_read_ids = [br.id for br in buddy_reads_to_delete if br.id is not None]
+        
+        if buddy_read_ids:
+            session.exec(
+                delete(BuddyReadComment).where(BuddyReadComment.buddy_read_id.in_(buddy_read_ids))
+            )
+            session.exec(
+                delete(BuddyReadInvitation).where(BuddyReadInvitation.buddy_read_id.in_(buddy_read_ids))
+            )
+            session.exec(
+                delete(BuddyReadMember).where(BuddyReadMember.buddy_read_id.in_(buddy_read_ids))
+            )
+        
+        for br in buddy_reads_to_delete:
+            session.delete(br)
+
+
+    # Xóa link Thể loại
+    session.exec(delete(BookCategoryLink).where(BookCategoryLink.book_id == book_id))
+    
+    # Xóa trạng thái của User (Kệ sách)
+    session.exec(delete(UserBookStatus).where(UserBookStatus.book_id == book_id))
+    
+    # Xóa tiến độ đọc
+    session.exec(delete(ReadingProgress).where(ReadingProgress.book_id == book_id))
+    
+    # Xóa link Sách của CLB
+    session.exec(delete(BookClubBook).where(BookClubBook.book_id == book_id))
+    
+    # Xóa Tóm tắt AI (Cache)
+    cached_summary = session.get(AiSummaryCache, book_id)
+    if cached_summary:
+        session.delete(cached_summary)
+    
+    # 3. XÓA "CHA" (Sách)
     session.delete(book)
+    
     session.commit()
-    return {"message": f"Book with id {book_id} has been deleted"}
+    
+    return {"message": f"Book with id {book_id} and all related data has been deleted"}
 
 # === USER BOOK STATUS ROUTES ===
 @router.get('/status/all', response_model=list[UserBookStatus])
