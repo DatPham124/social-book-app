@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL, AVATAR_SERVER_URL } from '../config';
 import { useAuth } from '../composables/useAuth';
-import { getProfile } from '../composables/useProfile';
 import { useBooks } from '../composables/useBook';
 import BookStatusSelect from '../components/books/BookStatusSelect.vue'; 
 
@@ -216,7 +215,7 @@ onMounted(() => {
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Năm xuất bản</label>
           <div class="flex items-center gap-3">
-            <input vd-model.number="filters.year_min" type="number"
+            <input v-model.number="filters.year_min" type="number"
               class="w-full md:w-32 border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 focus:outline-none" 
               placeholder="Từ (VD: 1990)" />
             <span class="text-gray-500">-</span>
@@ -248,7 +247,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Kết quả -->
     <div>
       <div v-if="loading" class="text-center text-gray-500 py-10">
         Đang tải sách...
@@ -276,7 +274,7 @@ onMounted(() => {
             v-if="book.cover_url"
             :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`"
             :alt="book.title"
-            class="w-32 md:w-36 h-auto object-contain rounded shadow-md flex-shrink-0 cursor-pointer"
+            class="w-32 md:w-36 h-48 object-cover rounded shadow-md flex-shrink-0 cursor-pointer"
             @click="goToBook(book.id)"
           />
           <div v-else class="w-32 md:w-36 h-48 bg-gray-100 rounded flex items-center justify-center text-4xl text-gray-400 flex-shrink-0">

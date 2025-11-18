@@ -33,6 +33,10 @@ import StatisticsTab from "../views/StatisticsTab.vue";
 
 import SearchView from "../views/SearchView.vue";
 
+import Recommendations from "../views/Recommendations.vue";
+
+import Challenge from "../views/Challenge.vue";
+
 const routes = [
   { path: "/login", name: "Login", component: Login },
   { path: "/home", name: "Home", component: Home },
@@ -130,6 +134,20 @@ const routes = [
     path: "/search",
     name: "Search",
     component: SearchView,
+  },
+
+  {
+    path: "/recommendations",
+    name: "Recommendations",
+    component: Recommendations,
+    meta: { requiresAuth: true },
+  },
+  
+  {
+    path: "/challenge",
+    name: "Challenge",
+    component: Challenge,
+    meta: { requiresAuth: true },
   },
 
   { path: "/", redirect: "/login" },

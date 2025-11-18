@@ -2,7 +2,6 @@
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import Navbar from "../components/layout/Navbar.vue";
-// 1. IMPORT CÁC HÀM CẦN THIẾT
 import { useBooks } from "../composables/useBook";
 import { getProfile } from "../composables/useProfile";
 import { BOOK_SERVICE_URL, USER_SERVICE_URL, AVATAR_SERVER_URL, COVER_IMAGE_SERVER_URL } from "../config";
@@ -11,7 +10,6 @@ import axios from "axios";
 import BookProgress from "../components/books/BookProgress.vue";
 import BookStatusSelect from "../components/books/BookStatusSelect.vue";
 
-// IMPORT HÀM updateReadingDates
 const { fetchBook, formatDate, toggleFavoriteStatus, getUserBookStatus, updateReadingDates } = useBooks();
 const route = useRoute();
 
@@ -26,16 +24,14 @@ const friendActivity = ref<any[]>([]);
 const loadingFriends = ref(true);
 const friendError = ref<string | null>(null);
 
-// STATE MỚI CHO VIỆC SỬA NGÀY
 const isEditingDates = ref(false);
 const isSavingDates = ref(false);
 const tempStartDate = ref<string | null>(null);
 const tempFinishDate = ref<string | null>(null);
 
-// STATE MỚI CHO AI SUMMARY
-const showAiSummaryModal = ref(false);
-const isLoadingAiSummary = ref(false);
+const isLoadingAiSummary = ref(true);
 const aiSummaryText = ref("");
+const aiSummaryError = ref<string | null>(null); // State mới để báo lỗi
 
 const statuses = [
   { value: "to_read", label: "Sẽ đọc" },
@@ -132,28 +128,73 @@ function renderStars(rating: number) {
   return stars;
 }
 
+// *** HÀM TÓM TẮT AI ĐÃ ĐƯỢC CẬP NHẬT ***
+async function loadAiSummary() {
+  if (!bookId) return;
+  isLoadingAiSummary.value = true;
+  aiSummaryText.value = "";
+  aiSummaryError.value = null; // Reset lỗi
+
+  try {
+    const res = await axios.get(`${BOOK_SERVICE_URL}books/${bookId}/ai-summary`);
+    const fullText = res.data.summary_text;
+
+    if (!fullText) {
+      aiSummaryError.value = "Không thể tạo tóm tắt AI cho sách này.";
+      isLoadingAiSummary.value = false;
+      return;
+    }
+
+    // Dừng loading
+    isLoadingAiSummary.value = false;
+
+    // Bắt đầu hiệu ứng gõ chữ
+    let i = 0;
+    const typingInterval = setInterval(() => {
+      if (i < fullText.length) {
+        aiSummaryText.value += fullText.charAt(i);
+        i++;
+      } else {
+        clearInterval(typingInterval);
+      }
+    }, 25); // 25ms (điều chỉnh tốc độ gõ ở đây)
+
+  } catch (err: any) {
+    console.error("Lỗi tải tóm tắt AI:", err);
+    aiSummaryError.value = err.response?.data?.detail || "Lỗi khi tạo tóm tắt.";
+    isLoadingAiSummary.value = false;
+  }
+}
+
+
 onMounted(async () => {
   try {
     loading.value = true;
     if (!bookId) {
       error.value = "Không tìm thấy ID sách.";
+      loading.value = false;
       return;
     }
+    
     const data = await fetchBook(bookId, userInfo.value?.user_id);
     if (!data) {
       error.value = "Không tìm thấy dữ liệu sách.";
+      loading.value = false;
       return;
     }
+    
     book.value = data;
     currentStatus.value = mapStatus(data.status || "to_read");
+    loading.value = false; 
+
+    loadFriendActivity();
+    loadAiSummary();
+
   } catch (err) {
     console.error(err);
     error.value = "Đã xảy ra lỗi khi tải dữ liệu sách.";
-  } finally {
     loading.value = false;
   }
-
-  loadFriendActivity();
 });
 
 function formatYear(dateString: string) {
@@ -228,35 +269,26 @@ async function saveDates() {
     isSavingDates.value = false;
   }
 }
+</script>
 
-// *** HÀM MỚI (ĐÃ SỬA) ĐỂ GỌI API TEST CỦA BẠN ***
-async function getAISummary() {
-  if (!book.value) return;
-  isLoadingAiSummary.value = true;
-  aiSummaryText.value = "";
-  showAiSummaryModal.value = true;
-
-  try {
-    // 1. Chuẩn bị params
-    const params = {
-      book_title: book.value.title,
-      book_author: book.value.author,       // (Trường 'author' này đã được 'fetchBook' lấy về)
-      book_description: book.value.description // (Trường 'description' cũng đã được lấy về)
-    };
-
-    // 2. Gọi API test mới (books/ai-summary/)
-    // API này không cần book_id trong path, mà nhận params
-    const res = await axios.get(`${BOOK_SERVICE_URL}books/ai-summary/`, { params });
-    
-    aiSummaryText.value = res.data.summary_text;
-  } catch (err: any) {
-    aiSummaryText.value = "Lỗi: " + (err.response?.data?.detail || "Không thể tạo tóm tắt.");
-  } finally {
-    isLoadingAiSummary.value = false;
-  }
+<!-- Thêm CSS cho hiệu ứng con trỏ (cursor) nhấp nháy -->
+<style>
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: #333;
+  animation: blink 0.7s infinite;
+  margin-left: 2px;
+  position: relative;
+  top: 1px;
 }
 
-</script>
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+</style>
 
 <template>
   <Navbar />
@@ -266,14 +298,12 @@ async function getAISummary() {
     <div v-else-if="error" class="text-center text-red-500 py-12">{{ error }}</div>
 
     <div v-else class="grid grid-cols-12 gap-8">
-      <!-- Cột 1 (Bìa sách) -->
       <div class="col-span-3 space-y-6">
         <div class="rounded-lg overflow-hidden shadow-md bg-gray-50">
           <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" :alt="book.title"
             class="w-full h-auto object-cover" />
         </div>
 
-        <!-- Khối Hoạt động bạn bè -->
         <div class="bg-white border rounded-lg shadow-sm p-4">
           <h3 class="font-semibold mb-3 text-gray-800 text-sm uppercase tracking-wide">Hoạt động bạn bè</h3>
           <div v-if="loadingFriends" class="text-gray-500 text-sm italic">
@@ -311,7 +341,6 @@ async function getAISummary() {
         </div>
       </div>
 
-      <!-- Cột 2 (Thông tin sách) -->
       <div class="col-span-6 space-y-6">
         <div>
           <h1 class="text-2xl font-bold text-gray-900">{{ book.title }}</h1>
@@ -328,21 +357,27 @@ async function getAISummary() {
           </span>
         </div>
 
-        <!-- KHỐI GIỚI THIỆU VÀ NÚT TÓM TẮT AI -->
         <div class="bg-white border rounded-lg shadow-sm p-4">
-          <h3 class="font-semibold text-gray-800 mb-2 uppercase text-sm tracking-wide">Giới thiệu nội dung</h3>
-          <p class="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
-            {{ book.description || "Chưa có mô tả cho cuốn sách này." }}
-          </p>
+          <h3 class="font-semibold text-gray-800 mb-2 uppercase text-sm tracking-wide">Tóm tắt bởi AI</h3>
           
-          <!-- NÚT TÓM TẮT AI MỚI -->
-          <button
-            @click="getAISummary"
-            class="mt-4 px-3 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-md shadow hover:bg-gray-700 transition-colors"
-          >
-            🤖 Xem tóm tắt bằng AI...
-          </button>
+          <div v-if="isLoadingAiSummary" class="text-center text-gray-500 py-5 italic text-sm">
+            🤖 AI đang tóm tắt...
+          </div>
+          
+          <div v-else-if="aiSummaryError" class="text-center text-red-500 py-5 italic text-sm">
+            {{ aiSummaryError }}
+          </div>
+          
+          <div v-else-if="aiSummaryText" class="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
+            {{ aiSummaryText }}
+            <span v-if="aiSummaryText.length > 0" class="typing-cursor"></span>
+          </div>
+
+          <div v-else class="text-center text-gray-500 py-5 italic text-sm">
+            Không có tóm tắt.
+          </div>
         </div>
+        
 
         <div class="bg-white border rounded-lg shadow-sm p-4">
           <h3 class="font-semibold text-gray-800 mb-2 uppercase text-sm tracking-wide">Đánh giá từ cộng đồng</h3>
@@ -364,7 +399,6 @@ async function getAISummary() {
           </div>
         </div>
 
-        <!-- KHỐI HOẠT ĐỘNG CỦA BẠN (ĐÃ THAY THẾ "CẢNH BÁO NỘI DUNG") -->
         <div class="bg-white border rounded-lg shadow-sm p-4" v-if="userInfo">
           <div class="flex justify-between items-center mb-2">
             <h3 class="font-semibold text-gray-800 uppercase text-sm tracking-wide">Hoạt động của bạn</h3>
@@ -441,7 +475,6 @@ async function getAISummary() {
         
       </div>
 
-      <!-- Cột 3 (Hành động) -->
       <div class="col-span-3 space-y-6">
         <RouterLink :to="{ name: 'ReviewBook', params: { id: bookId }, query: { user: userInfo?.user_id } }"
           class="block text-yellow-600 hover:text-yellow-700 font-semibold">
@@ -478,38 +511,6 @@ async function getAISummary() {
           <p><strong>Tổng số trang:</strong> {{ book.page_count }}</p>
           <p><strong>Ngôn ngữ:</strong> {{ book.language }}</p>
         </div>
-      </div>
-    </div>
-  </div>
-  
-  <!-- MODAL MỚI CHO AI SUMMARY -->
-  <div
-    v-if="showAiSummaryModal"
-    @click.self="showAiSummaryModal = false"
-    class="fixed inset-0 bg-opacity-30 backdrop-blur-sm flex justify-center items-center z-50 p-4"
-  >
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-semibold text-gray-800">Tóm tắt bằng AI</h3>
-        <button @click="showAiSummaryModal = false" class="text-gray-400 hover:text-gray-600">&times;</button>
-      </div>
-      
-      <div v-if="isLoadingAiSummary" class="text-center text-gray-500 py-10">
-        <p>🤖 AI đang đọc và tóm tắt...</p>
-        <p class="text-sm italic">(Việc này có thể mất vài giây)</p>
-      </div>
-      
-      <div v-else class="text-gray-700 space-y-2 whitespace-pre-line">
-        {{ aiSummaryText }}
-      </div>
-      
-      <div class="flex justify-end mt-5">
-        <button
-          @click="showAiSummaryModal = false"
-          class="px-4 py-2 border border-gray-400 rounded-md text-gray-600 hover:bg-gray-100"
-        >
-          Đóng
-        </button>
       </div>
     </div>
   </div>
