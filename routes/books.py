@@ -14,7 +14,7 @@ from pathlib import Path
 from ..model import (
     BookStatus, Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink, Authors,
     AiSummaryCache, BuddyRead, BuddyReadMember, BuddyReadComment, BuddyReadInvitation,
-    BookClubBook
+    BookClubBook, BookAudio
 )
 from common_lib.database import get_session_book_service
 
@@ -66,8 +66,6 @@ def get_all_books(session: Session = Depends(get_session_book_service)):
     books = session.exec(statement).all()
     return books
 
-
-# (Đảm bảo 'AiSummaryCache', 'Authors', 'Books', 'types' ... đã được import ở đầu file)
 
 @router.get("/{book_id}/ai-summary", response_model=SummaryResponse)
 def get_ai_summary(
@@ -182,13 +180,47 @@ def get_book_by_id(book_id: int, session: Session = Depends(get_session_book_ser
     
     return book
 
+@router.post("/{book_id}/audio/add")
+def add_audio_chapter(
+    book_id: int,
+    title: str = Body(...),
+    file_url: str = Body(...),
+    order: int = Body(0),
+    session: Session = Depends(get_session_book_service)
+):
+    audio = BookAudio(book_id=book_id, title=title, file_url=file_url, order=order)
+    session.add(audio)
+    session.commit()
+    return audio
+
+# API LẤY CHI TIẾT SÁCH KÈM AUDIO
+@router.get("/{book_id}/details") 
+def get_book_with_audios(
+    book_id: int,
+    session: Session = Depends(get_session_book_service)
+):
+    book = session.get(Books, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Book not found")
+    
+    # Lấy danh sách audio
+    audios = session.exec(
+        select(BookAudio).where(BookAudio.book_id == book_id).order_by(BookAudio.order)
+    ).all()
+    
+    # Trả về dạng Dict
+    return {
+        **book.model_dump(),
+        "audios": audios
+    }
+
 @router.put('/update/{book_id}', response_model=Books)
 def update_book(book_id: int, book_data: Books, session: Session = Depends(get_session_book_service)):
     book = session.get(Books, book_id)
     if book is None:
         raise HTTPException(status_code=404, detail='No book found')
     
-    update_fields = ["title", "description", "cover_url", "published_date", "language", "authorID", "page_count"]
+    update_fields = ["title", "description", "cover_url", "published_date", "language", "authorID", "page_count", "audio_url"]
     for field in update_fields:
         value = getattr(book_data, field)
         if value is not None:

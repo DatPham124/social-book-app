@@ -290,3 +290,174 @@ Không giải thích gì thêm.
         except:
             pass
         raise HTTPException(status_code=500, detail=f"AI không thể tạo gợi ý: {str(e)}")
+    
+class ChatMessageHistory(BaseModel):
+    role: str # "user" hoặc "model"
+    message: str
+
+class CharacterChatRequest(BaseModel):
+    book_id: int
+    character_name: str
+    user_message: str
+    history: List[ChatMessageHistory] = []
+
+class CharacterChatResponse(BaseModel):
+    reply: str
+
+class CharacterListResponse(BaseModel):
+    characters: List[str]
+    
+# === CHỨC NĂNG CHAT NHÂN VẬT (ĐÃ NÂNG CẤP XỬ LÝ BIÊN) ===
+
+# 1. API LẤY DANH SÁCH (Đã sửa prompt để thông minh hơn)
+@router.get("/characters/{book_id}", response_model=CharacterListResponse)
+def get_book_characters(
+    book_id: int,
+    session: Session = Depends(get_session_book_service)
+):
+    if not client:
+        raise HTTPException(status_code=500, detail="Dịch vụ AI chưa được cấu hình")
+
+    book_stmt = (
+        select(Books.title, Authors.name.label("author_name"))
+        .join(Authors, Books.authorID == Authors.id, isouter=True)
+        .where(Books.id == book_id)
+    )
+    result = session.exec(book_stmt).first()
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Không tìm thấy sách")
+        
+    book_title, author_name = result
+    
+    # --- SỬA PROMPT: Xử lý sách không có nhân vật ---
+    prompt = f"""
+    Phân tích cuốn sách: "{book_title}" của tác giả "{author_name}".
+    
+    Nhiệm vụ: Hãy liệt kê 5 "vai diễn" (personas) mà người đọc có thể trò chuyện cùng.
+    
+    QUY TẮC XỬ LÝ:
+    1. Nếu là Sách Truyện/Tiểu thuyết: Liệt kê các nhân vật chính (Ví dụ: Harry Potter, Ron).
+    2. Nếu là Sách Self-help/Kinh doanh/Học thuật (Ví dụ: Atomic Habits): Liệt kê Tên Tác Giả (Ví dụ: James Clear) hoặc các khái niệm được nhân cách hóa (Ví dụ: "Người Cố Vấn", "Chuyên gia Thói quen").
+    3. Nếu là Sách Nấu ăn: Liệt kê "Bếp trưởng" hoặc Tác giả.
+    4. Nếu không xác định được ai: Hãy trả về ["Tác giả", "Cuốn sách này"].
+    
+    YÊU CẦU ĐẦU RA:
+    Chỉ trả về một mảng JSON chứa danh sách tên (String).
+    Ví dụ: ["James Clear", "Huấn luyện viên thói quen"]
+    """
+
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            config=types.GenerateContentConfig(
+                temperature=0.1, # Cần sự chính xác hơn sáng tạo
+                response_mime_type="application/json",
+                safety_settings=[
+                    types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+                    types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
+                    types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+                    types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+                ]
+            ),
+            contents=prompt
+        )
+        
+        if not response.text:
+             # Fallback an toàn nếu AI trả rỗng
+             return CharacterListResponse(characters=["Tác giả", "Người dẫn chuyện"])
+
+        characters = json.loads(response.text)
+        
+        if isinstance(characters, dict) and "characters" in characters:
+             return CharacterListResponse(characters=characters["characters"])
+        elif isinstance(characters, list):
+             return CharacterListResponse(characters=characters)
+        else:
+             return CharacterListResponse(characters=["Tác giả"])
+             
+    except Exception as e:
+        print(f"Lỗi lấy nhân vật: {e}")
+        # Luôn trả về ít nhất một lựa chọn để UI không trống
+        return CharacterListResponse(characters=["Tác giả"])
+
+
+# 2. API CHAT NHÂN VẬT (Đã sửa prompt để nhập vai linh hoạt)
+@router.post("/chat-character", response_model=CharacterChatResponse)
+def chat_with_character(
+    request: CharacterChatRequest,
+    session: Session = Depends(get_session_book_service)
+):
+    if not client:
+        raise HTTPException(status_code=500, detail="Dịch vụ AI chưa được cấu hình")
+
+    # 1. Lấy thông tin sách
+    book_stmt = (
+        select(Books, Authors.name.label("author_name"))
+        .join(Authors, Books.authorID == Authors.id, isouter=True)
+        .where(Books.id == request.book_id)
+    )
+    result = session.exec(book_stmt).first()
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Không tìm thấy sách")
+        
+    book, author_name = result
+    
+    # 2. Tạo "System Instruction" (Lời nhắc hệ thống) - Định nghĩa vai trò
+    system_prompt = f"""
+    HÃY NHẬP VAI (ROLEPLAY):
+    Tên bạn là: **{request.character_name}**.
+    Bạn là một nhân vật trong cuốn sách: **"{book.title}"** của tác giả **"{author_name or 'Unknown'}"**.
+    Bối cảnh/Mô tả sách: "{book.description or 'Không có mô tả'}"
+
+    NHIỆM VỤ:
+    1. **Giọng điệu:** Hãy giữ đúng tính cách của nhân vật (ví dụ: Hermione thì thông thái, Voldemort thì kiêu ngạo).
+    2. **Tự nhiên:** Đừng cứng nhắc. Hãy thoải mái bộc lộ cảm xúc, suy nghĩ, hạn chế đặt câu hỏi ngược lại nếu không cần thiết.
+    3. **Đời thường:** Trả lời ngắn gọn (dưới 100 từ), đi thẳng vào vấn đề, không cần chào hỏi quá trang trọng nếu không cần thiết.
+    4. **Nhập tâm:** Tuyệt đối không bao giờ nói "Tôi là AI" hay "Tôi là mô hình ngôn ngữ". Hãy sống trọn vẹn vai diễn của mình.
+    """
+
+    # 3. Xây dựng chuỗi hội thoại (History) cho Gemini
+    chat_contents = []
+    
+    # Thêm lịch sử cũ (nếu có)
+    if request.history:
+        for msg in request.history:
+            # Map role từ frontend ("user"/"ai") sang Gemini ("user"/"model")
+            gemini_role = "user" if msg.role == "user" else "model"
+            chat_contents.append(
+                types.Content(role=gemini_role, parts=[types.Part(text=msg.message)])
+            )
+    
+    # Thêm tin nhắn mới nhất của user
+    chat_contents.append(
+        types.Content(role="user", parts=[types.Part(text=request.user_message)])
+    )
+
+    # 4. Gọi Gemini
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            config=types.GenerateContentConfig(
+                temperature=0.8, 
+                system_instruction=system_prompt, # Đưa roleplay vào system instruction
+                safety_settings=[
+                    types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+                    types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
+                    types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+                    types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+                ]
+            ),
+            contents=chat_contents # Gửi toàn bộ lịch sử
+        )
+        
+        if response.text:
+             return CharacterChatResponse(reply=response.text.strip())
+        else:
+             print(f"Gemini returned empty text. Safety ratings: {response.prompt_feedback}")
+             return CharacterChatResponse(reply="...(Nhân vật đang trầm tư hoặc không muốn trả lời câu hỏi này)...")
+
+    except Exception as e:
+        print(f"Lỗi Chat AI: {e}")
+        return CharacterChatResponse(reply="(Hệ thống: Có lỗi kết nối với nhân vật. Vui lòng thử lại sau.)")

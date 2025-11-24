@@ -203,3 +203,11 @@ class AnnualChallenge(SQLModel, table=True):
     year: int = Field(index=True) # Ví dụ: 2025
     goal_count: int # Mục tiêu (ví dụ: 20 cuốn)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+class BookAudio(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    book_id: int = Field(foreign_key="books.id", index=True)
+    title: str 
+    file_url: str 
+    duration: Optional[str] = None 
+    order: int = Field(default=0) 
