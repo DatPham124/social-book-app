@@ -81,41 +81,31 @@ onMounted(async () => {
 
                     <div v-if="userInfo" class="hidden md:flex space-x-6 items-center">
                         <router-link to="/home" class="text-gray-700 hover:text-yellow-500">Trang chủ</router-link>
-                        
+
                         <router-link :to="{ name: 'StatisticsTab', params: { id: userInfo.user_id } }"
                             class="text-gray-700 hover:text-yellow-500">Thống kê
                         </router-link>
-                        
-                        <router-link :to="{ name: 'Recommendations' }" 
-                            class="text-gray-700 hover:text-yellow-500">
+
+                        <router-link :to="{ name: 'Recommendations' }" class="text-gray-700 hover:text-yellow-500">
                             Gợi ý AI
                         </router-link>
 
-                        <!-- *** LINK THỬ THÁCH MỚI *** -->
-                        <router-link :to="{ name: 'Challenge' }" 
-                            class="text-gray-700 hover:text-yellow-500">
+                        <router-link :to="{ name: 'Challenge' }" class="text-gray-700 hover:text-yellow-500">
                             Thử thách
                         </router-link>
-                        
+
                         <router-link to="/community" class="text-gray-700 hover:text-yellow-500">Cộng đồng</router-link>
                         <router-link to="/friends" class="text-gray-700 hover:text-yellow-500">Bạn bè</router-link>
-                        
-                        <!-- Ô tìm kiếm -->
+
                         <div class="relative">
-                            <span 
-                                class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 cursor-pointer"
-                                @click="handleSearch"
-                            >
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 cursor-pointer"
+                                @click="handleSearch">
                                 <font-awesome-icon icon="fa-solid fa-magnifying-glass" />
                             </span>
-    
-                            <input 
-                                type="text" 
-                                placeholder="Tìm kiếm sách, bạn bè..." 
+
+                            <input type="text" placeholder="Tìm kiếm sách, bạn bè..."
                                 class="pl-10 border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full"
-                                v-model="searchQuery" 
-                                @keydown.enter="handleSearch"
-                            >
+                                v-model="searchQuery" @keydown.enter="handleSearch">
                         </div>
                     </div>
                 </div>
@@ -157,7 +147,7 @@ onMounted(async () => {
                                 </router-link>
                                 </MenuItem>
                                 <MenuItem v-slot="{ active }">
-                                <router-link :to="{ name: 'Challenge' }" 
+                                <router-link :to="{ name: 'Challenge' }"
                                     :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
                                     Thử thách đọc sách
                                 </router-link>

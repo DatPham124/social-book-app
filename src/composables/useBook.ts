@@ -102,7 +102,9 @@ async function getReviewCount(book_id: number) {
 
   async function fetchBook(bookId: number, userId?: number) {
     try {
-      const bookData = await getBookById(bookId);
+      const bookRes = await axios.get(`${BOOK_SERVICE_URL}books/${bookId}/details`);
+      const bookData = bookRes.data;
+      
       if (!bookData) return null;
 
       const author = bookData.authorID ? await getAuthor(bookData.authorID) : null;
@@ -115,12 +117,13 @@ async function getReviewCount(book_id: number) {
       }
 
       const progress = userId ? await getReadingProgress(userId, bookData.id) : null;
-
       const userStatus = userId ? await getUserBookStatus(userId, bookData.id) : null;
-
-      const averageRating = await getAverage(bookData.id)
-
-      const reviewCount = await getReviewCount(bookData.id)
+      
+      const averageData = await getAverage(bookData.id);
+      const rating = averageData?.average_rating || 0; 
+      
+      const reviewCountData = await getReviewCount(bookData.id);
+      const review_count = reviewCountData?.review_count || 0;
 
       const current_page = progress?.current_page || 0;
       const total_pages = bookData.page_count || 0;
@@ -137,11 +140,11 @@ async function getReviewCount(book_id: number) {
         newPage: current_page,
         status: userStatus?.status || "to_read",
         start_date: userStatus?.start_date || null,
-        finish_date: userStatus?.finish_date || null, // <-- Thêm finish_date
-        is_favorite: userStatus?.is_favorite || false, // <-- Thêm is_favorite
-        rating: averageRating?.average_rating || 0.0, // <-- Lấy rating thật
-        review_count: reviewCount?.review_count || 0,
-        // warnings: [], // Đã xóa
+        finish_date: userStatus?.finish_date || null,
+        rating: rating,
+        review_count: review_count,
+        is_favorite: userStatus?.is_favorite || false,        
+        audios: bookData.audios || [] 
       };
     } catch (error) {
       console.error("Lỗi khi tải chi tiết sách:", error);

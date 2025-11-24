@@ -37,6 +37,11 @@ import Recommendations from "../views/Recommendations.vue";
 
 import Challenge from "../views/Challenge.vue";
 
+import AudioBook from "../views/AudioBook.vue";
+
+import ImmersiveRead from "../views/ImmersiveRead.vue";
+
+
 const routes = [
   { path: "/login", name: "Login", component: Login },
   { path: "/home", name: "Home", component: Home },
@@ -147,6 +152,30 @@ const routes = [
     path: "/challenge",
     name: "Challenge",
     component: Challenge,
+    meta: { requiresAuth: true },
+  },
+
+ {
+    // Sửa đường dẫn: Thêm tham số :id
+    path: "/buddy-read/:id/room", 
+    name: "AudioBook",
+    component: AudioBook,
+    meta: { requiresAuth: true },
+    props: { mode: 'group' }
+  },
+
+  {
+    path: "/book/:id/listen",
+    name: "PersonalAudioBook",
+    component: AudioBook,
+    meta: { requiresAuth: true },
+    props: { mode: 'solo' } // Chế độ Cá nhân
+  },
+
+  {
+    path: "/book/:id/immersive",
+    name: "ImmersiveRead",
+    component: ImmersiveRead,
     meta: { requiresAuth: true },
   },
 

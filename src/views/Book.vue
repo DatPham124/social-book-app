@@ -9,6 +9,7 @@ import { jwtDecode } from "jwt-decode";
 import axios from "axios";
 import BookProgress from "../components/books/BookProgress.vue";
 import BookStatusSelect from "../components/books/BookStatusSelect.vue";
+import CharacterChatModal from "../components/books/CharacterChatModal.vue";
 
 const { fetchBook, formatDate, toggleFavoriteStatus, getUserBookStatus, updateReadingDates } = useBooks();
 const route = useRoute();
@@ -31,7 +32,9 @@ const tempFinishDate = ref<string | null>(null);
 
 const isLoadingAiSummary = ref(true);
 const aiSummaryText = ref("");
-const aiSummaryError = ref<string | null>(null); // State mới để báo lỗi
+const aiSummaryError = ref<string | null>(null);
+
+const showCharacterChat = ref(false);
 
 const statuses = [
   { value: "to_read", label: "Sẽ đọc" },
@@ -128,12 +131,11 @@ function renderStars(rating: number) {
   return stars;
 }
 
-// *** HÀM TÓM TẮT AI ĐÃ ĐƯỢC CẬP NHẬT ***
 async function loadAiSummary() {
   if (!bookId) return;
   isLoadingAiSummary.value = true;
   aiSummaryText.value = "";
-  aiSummaryError.value = null; // Reset lỗi
+  aiSummaryError.value = null;
 
   try {
     const res = await axios.get(`${BOOK_SERVICE_URL}books/${bookId}/ai-summary`);
@@ -145,10 +147,7 @@ async function loadAiSummary() {
       return;
     }
 
-    // Dừng loading
     isLoadingAiSummary.value = false;
-
-    // Bắt đầu hiệu ứng gõ chữ
     let i = 0;
     const typingInterval = setInterval(() => {
       if (i < fullText.length) {
@@ -157,7 +156,7 @@ async function loadAiSummary() {
       } else {
         clearInterval(typingInterval);
       }
-    }, 25); // 25ms (điều chỉnh tốc độ gõ ở đây)
+    }, 25);
 
   } catch (err: any) {
     console.error("Lỗi tải tóm tắt AI:", err);
@@ -165,7 +164,6 @@ async function loadAiSummary() {
     isLoadingAiSummary.value = false;
   }
 }
-
 
 onMounted(async () => {
   try {
@@ -175,17 +173,17 @@ onMounted(async () => {
       loading.value = false;
       return;
     }
-    
+
     const data = await fetchBook(bookId, userInfo.value?.user_id);
     if (!data) {
       error.value = "Không tìm thấy dữ liệu sách.";
       loading.value = false;
       return;
     }
-    
+
     book.value = data;
     currentStatus.value = mapStatus(data.status || "to_read");
-    loading.value = false; 
+    loading.value = false;
 
     loadFriendActivity();
     loadAiSummary();
@@ -248,7 +246,7 @@ function openDateEditor() {
 async function saveDates() {
   if (!userInfo.value) return;
   isSavingDates.value = true;
-  
+
   try {
     const userId = userInfo.value.user_id;
     const bookId = book.value.id;
@@ -257,10 +255,10 @@ async function saveDates() {
     const newFinishDate = tempFinishDate.value || null;
 
     const updatedStatus = await updateReadingDates(userId, bookId, newStartDate, newFinishDate);
-    
+
     book.value.start_date = updatedStatus.start_date;
     book.value.finish_date = updatedStatus.finish_date;
-    
+
     isEditingDates.value = false;
   } catch (error) {
     console.error("Lỗi khi lưu ngày:", error);
@@ -269,9 +267,15 @@ async function saveDates() {
     isSavingDates.value = false;
   }
 }
+
+function handleProgressAutoUpdate(newPages: number) {
+  if (book.value) {
+    book.value.current_page = newPages;
+    book.value.progress_percentage = 100;
+  }
+}
 </script>
 
-<!-- Thêm CSS cho hiệu ứng con trỏ (cursor) nhấp nháy -->
 <style>
 .typing-cursor {
   display: inline-block;
@@ -285,19 +289,27 @@ async function saveDates() {
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
 }
 </style>
 
 <template>
   <Navbar />
 
-  <div class="max-w-7xl mx-auto px-6 py-10">
+  <div class="max-w-7xl mx-auto px-6 py-10 relative">
     <div v-if="loading" class="text-center text-gray-500 py-12">Đang tải dữ liệu sách...</div>
     <div v-else-if="error" class="text-center text-red-500 py-12">{{ error }}</div>
 
     <div v-else class="grid grid-cols-12 gap-8">
+      <!-- CỘT 1 -->
       <div class="col-span-3 space-y-6">
         <div class="rounded-lg overflow-hidden shadow-md bg-gray-50">
           <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" :alt="book.title"
@@ -341,6 +353,7 @@ async function saveDates() {
         </div>
       </div>
 
+      <!-- CỘT 2 -->
       <div class="col-span-6 space-y-6">
         <div>
           <h1 class="text-2xl font-bold text-gray-900">{{ book.title }}</h1>
@@ -359,25 +372,20 @@ async function saveDates() {
 
         <div class="bg-white border rounded-lg shadow-sm p-4">
           <h3 class="font-semibold text-gray-800 mb-2 uppercase text-sm tracking-wide">Tóm tắt bởi AI</h3>
-          
           <div v-if="isLoadingAiSummary" class="text-center text-gray-500 py-5 italic text-sm">
-            🤖 AI đang tóm tắt...
+            🤖 Đang tóm tắt...
           </div>
-          
           <div v-else-if="aiSummaryError" class="text-center text-red-500 py-5 italic text-sm">
             {{ aiSummaryError }}
           </div>
-          
           <div v-else-if="aiSummaryText" class="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
             {{ aiSummaryText }}
             <span v-if="aiSummaryText.length > 0" class="typing-cursor"></span>
           </div>
-
           <div v-else class="text-center text-gray-500 py-5 italic text-sm">
             Không có tóm tắt.
           </div>
         </div>
-        
 
         <div class="bg-white border rounded-lg shadow-sm p-4">
           <h3 class="font-semibold text-gray-800 mb-2 uppercase text-sm tracking-wide">Đánh giá từ cộng đồng</h3>
@@ -402,18 +410,12 @@ async function saveDates() {
         <div class="bg-white border rounded-lg shadow-sm p-4" v-if="userInfo">
           <div class="flex justify-between items-center mb-2">
             <h3 class="font-semibold text-gray-800 uppercase text-sm tracking-wide">Hoạt động của bạn</h3>
-            <button
-              v-if="!isEditingDates"
-              @click="openDateEditor"
-              class="text-xs text-yellow-600 hover:text-yellow-700 font-semibold"
-            >
+            <button v-if="!isEditingDates" @click="openDateEditor"
+              class="text-xs text-yellow-600 hover:text-yellow-700 font-semibold">
               Chỉnh sửa ngày
             </button>
-            <button
-              v-else
-              @click="isEditingDates = false"
-              class="text-xs text-gray-500 hover:text-gray-700 font-semibold"
-            >
+            <button v-else @click="isEditingDates = false"
+              class="text-xs text-gray-500 hover:text-gray-700 font-semibold">
               Hủy
             </button>
           </div>
@@ -448,33 +450,24 @@ async function saveDates() {
           <div v-else class="space-y-3">
             <div class="text-sm">
               <label class="block font-medium text-gray-700">Ngày bắt đầu</label>
-              <input 
-                type="date" 
-                v-model="tempStartDate"
-                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-1.5 text-sm"
-              />
+              <input type="date" v-model="tempStartDate"
+                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-1.5 text-sm" />
             </div>
             <div class="text-sm">
               <label class="block font-medium text-gray-700">Ngày kết thúc</label>
-              <input 
-                type="date" 
-                v-model="tempFinishDate"
-                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-1.5 text-sm"
-              />
+              <input type="date" v-model="tempFinishDate"
+                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-1.5 text-sm" />
             </div>
-            <button
-              @click="saveDates"
-              :disabled="isSavingDates"
-              class="w-full py-1.5 rounded text-sm transition-colors duration-200 bg-yellow-400 text-black font-semibold hover:bg-yellow-500"
-            >
+            <button @click="saveDates" :disabled="isSavingDates"
+              class="w-full py-1.5 rounded text-sm transition-colors duration-200 bg-yellow-400 text-black font-semibold hover:bg-yellow-500">
               <span v-if="isSavingDates">Đang lưu...</span>
               <span v-else>Lưu ngày</span>
             </button>
           </div>
         </div>
-        
       </div>
 
+      <!-- CỘT 3 -->
       <div class="col-span-3 space-y-6">
         <RouterLink :to="{ name: 'ReviewBook', params: { id: bookId }, query: { user: userInfo?.user_id } }"
           class="block text-yellow-600 hover:text-yellow-700 font-semibold">
@@ -484,8 +477,9 @@ async function saveDates() {
         <div class="bg-white border rounded-lg shadow-sm p-4 space-y-3">
           <BookProgress v-if="userInfo" :book="book" :userId="userInfo.user_id"
             @update="(updatedBook) => (book = updatedBook)" />
+
           <BookStatusSelect v-if="currentStatus && userInfo" v-model="currentStatus" :bookId="book.id"
-            :userId="userInfo.user_id" />
+            :userId="userInfo.user_id" :totalPages="book.page_count" @progress-updated="handleProgressAutoUpdate" />
 
           <button v-if="userInfo" @click="handleToggleFavorite" :disabled="isTogglingFavorite"
             class="w-full py-1.5 rounded border text-sm transition-colors duration-200" :class="[
@@ -497,6 +491,21 @@ async function saveDates() {
             <span v-else>
               {{ book.is_favorite ? '💛 Đã yêu thích' : '💛 Thêm vào danh sách yêu thích' }}
             </span>
+          </button>
+
+          <router-link v-if="book && book.audios && book.audios.length > 0"
+            :to="{ name: 'PersonalAudioBook', params: { id: bookId } }"
+            class="w-full py-2 mt-2 rounded bg-green-600 hover:bg-green-700 text-white font-bold shadow-md transition flex justify-center items-center gap-2">
+            <span>🎧</span> Nghe Sách Ngay
+          </router-link>
+
+          <router-link :to="{ name: 'ImmersiveRead', params: { id: bookId } }"
+            class="block w-full py-2 mt-2 rounded border text-sm text-center font-bold transition-colors duration-200 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100">
+            📖 Vào Phòng Đọc (Focus Mode)
+          </router-link>
+
+          <button class="w-full py-1.5 rounded border text-sm text-gray-700 hover:bg-gray-50">
+            📚 Đánh dấu là đã sở hữu
           </button>
         </div>
 
@@ -513,5 +522,23 @@ async function saveDates() {
         </div>
       </div>
     </div>
+
+    <!-- CHAT WIDGET (Giữ nguyên) -->
+    <div class="fixed bottom-6 right-6 z-40">
+      <button @click="showCharacterChat = !showCharacterChat"
+        class="w-14 h-14 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center transform hover:scale-110 transition-all duration-300 hover:shadow-xl focus:outline-none"
+        title="Chat với nhân vật AI">
+        <span v-if="!showCharacterChat" class="text-2xl">💬</span>
+        <span v-else class="text-2xl">&times;</span>
+      </button>
+      <transition enter-active-class="transition ease-out duration-300"
+        enter-from-class="opacity-0 translate-y-10 scale-95" enter-to-class="opacity-100 translate-y-0 scale-100"
+        leave-active-class="transition ease-in duration-200" leave-from-class="opacity-100 translate-y-0 scale-100"
+        leave-to-class="opacity-0 translate-y-10 scale-95">
+        <CharacterChatModal v-if="showCharacterChat" :bookId="bookId" :bookTitle="book?.title || ''"
+          @close="showCharacterChat = false" />
+      </transition>
+    </div>
+
   </div>
 </template>

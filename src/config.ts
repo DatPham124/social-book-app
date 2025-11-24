@@ -9,3 +9,5 @@ export const COVER_IMAGE_SERVER_URL = 'http://localhost/uploads/books'
 export const AVATAR_SERVER_URL = 'http://localhost/uploads/avatars'
 
 export const BOOKCLUB_IMAGE_SERVER_URL = 'http://localhost/uploads/bookclubs'
+
+export const AUDIO_SERVER_URL = 'http://localhost/uploads/audio'

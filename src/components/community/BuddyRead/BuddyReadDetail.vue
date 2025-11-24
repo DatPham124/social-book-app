@@ -310,6 +310,16 @@ onMounted(async () => {
             <p class="text-gray-600 mt-1">
               Đọc cùng <span class="font-medium">{{ memberNames }}</span>
             </p>
+
+            <!-- === NÚT ĐÃ ĐƯỢC THÊM VÀO ĐÂY === -->
+            <router-link 
+              :to="`/buddy-read/${buddyReadId}/room`"
+              class="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-full shadow-md transition-transform transform hover:scale-105"
+            >
+              <span>🎧</span> Vào Phòng Đọc Chung (Live)
+            </router-link>
+            <!-- ================================ -->
+
           </div>
         </div>
       </div>
@@ -412,4 +422,3 @@ onMounted(async () => {
     </div>
   </div>
 </template>
-
