@@ -211,3 +211,26 @@ class BookAudio(SQLModel, table=True):
     file_url: str 
     duration: Optional[str] = None 
     order: int = Field(default=0) 
+    
+class BookQuote(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    book_id: int = Field(foreign_key="books.id", index=True, nullable=False)
+    user_id: int = Field(index=True, nullable=False)
+    content: str = Field(sa_column=Column(Text, nullable=False))
+    
+    like_count: int = Field(default=0, index=True) 
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Quan hệ ngược
+    likes: List["BookQuoteLike"] = Relationship(back_populates="quote")
+    
+class BookQuoteLike(SQLModel, table=True):
+    user_id: int = Field(primary_key=True)
+    quote_id: int = Field(foreign_key="bookquote.id", primary_key=True)
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Quan hệ
+    quote: "BookQuote" = Relationship(back_populates="likes")
