@@ -10,6 +10,7 @@ import axios from "axios";
 import BookProgress from "../components/books/BookProgress.vue";
 import BookStatusSelect from "../components/books/BookStatusSelect.vue";
 import CharacterChatModal from "../components/books/CharacterChatModal.vue";
+import BookQuotes from "../components/books/BookQuotes.vue";
 
 const { fetchBook, formatDate, toggleFavoriteStatus, getUserBookStatus, updateReadingDates } = useBooks();
 const route = useRoute();
@@ -406,6 +407,9 @@ function handleProgressAutoUpdate(newPages: number) {
             </span>
           </div>
         </div>
+
+        <!-- 2. TÍCH HỢP BOOK QUOTES VÀO ĐÂY -->
+        <BookQuotes v-if="book" :bookId="bookId" :bookTitle="book.title" />
 
         <div class="bg-white border rounded-lg shadow-sm p-4" v-if="userInfo">
           <div class="flex justify-between items-center mb-2">

@@ -105,10 +105,6 @@ onUnmounted(() => {
                         <div v-else class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-xs font-bold text-indigo-600">
                             {{ user.username?.charAt(0).toUpperCase() }}
                         </div>
-                        
-                        <span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white"
-                            :class="{ 'bg-green-500': user.status === 'focus', 'bg-blue-400': user.status === 'break', 'bg-gray-400': user.status === 'idle' || user.status === 'paused' }">
-                        </span>
                     </div>
                     <div class="truncate text-xs font-medium">{{ user.username }}</div>
                 </div>

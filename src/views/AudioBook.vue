@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import Navbar from '../components/layout/Navbar.vue';
 import ReadingPlayer from '../components/community/Reading/ReadingPlayer.vue';
 import GroupChatPanel from '../components/community/Reading/GroupChatPanel.vue';
@@ -18,7 +18,7 @@ const route = useRoute();
 const router = useRouter();
 const { userInfo } = useAuth(); 
 
-const { joinRoom, leaveRoom, sendControl, remoteCommand } = useAudioSync();
+const { joinRoom, leaveRoom, sendControl, sendReaction, remoteCommand, incomingReaction } = useAudioSync();
 
 const currentBook = ref<any>(null);
 const audioChapters = ref<any[]>([]);
@@ -29,6 +29,8 @@ const pendingNextRoute = ref<Function | null>(null);
 const currentProgressPage = ref(0);
 const hostId = ref<number | null>(null);
 
+const floatingEmojis = ref<{ id: number, type: string, left: string }[]>([]);
+
 const roomId = computed(() => {
     if (props.mode === 'group') return `buddy_${route.params.id}`;
     return userInfo.value ? `solo_${userInfo.value.user_id}` : '';
@@ -37,9 +39,38 @@ const roomId = computed(() => {
 const isHost = computed(() => {
     if (props.mode === 'solo') return true;
     if (!userInfo.value || hostId.value === null) return false;
-    
     return String(userInfo.value.user_id) === String(hostId.value);
 });
+
+// --- LOGIC REACTION ĐÃ SỬA ---
+
+function handleReaction(emoji: string) {
+    if (props.mode === 'group' && userInfo.value) {
+        // Chỉ gửi lên server, KHÔNG tự spawn icon cục bộ nữa
+        // Để tránh hiện tượng hiện 2 lần (1 lần local, 1 lần do server báo về)
+        sendReaction(roomId.value, emoji, userInfo.value.user_id);
+    }
+}
+
+// Khi server báo về (bao gồm cả reaction của chính mình), mới cho hiện icon
+watch(incomingReaction, (val) => {
+    if (val) {
+        spawnEmoji(val.type);
+    }
+});
+
+function spawnEmoji(type: string) {
+    const id = Date.now() + Math.random();
+    const left = Math.floor(Math.random() * 80) + 10 + '%';
+    
+    floatingEmojis.value.push({ id, type, left });
+
+    setTimeout(() => {
+        floatingEmojis.value = floatingEmojis.value.filter(e => e.id !== id);
+    }, 2000);
+}
+
+// --- END LOGIC REACTION ---
 
 async function getProfile(userId: number) {
   try {
@@ -49,9 +80,7 @@ async function getProfile(userId: number) {
       { headers: { Authorization: `Bearer ${token}` } }
     );
     return response.data; 
-  } catch (error) {
-    return null;
-  }
+  } catch (error) { return null; }
 }
 
 async function loadBookInfo() {
@@ -115,27 +144,22 @@ async function confirmExit(save: boolean) {
 }
 
 onMounted(async () => {
-    if (!userInfo.value) {
-        router.push('/login');
-        return;
-    }
+    if (!userInfo.value) { router.push('/login'); return; }
     const detailedProfile = await getProfile(userInfo.value.user_id);
     if (detailedProfile) Object.assign(userInfo.value, detailedProfile);
     await loadBookInfo();
 });
 
-onUnmounted(() => {
-    if (props.mode === 'group') leaveRoom();
-});
+onUnmounted(() => { if (props.mode === 'group') leaveRoom(); });
 
 function goBack() { router.back(); }
 </script>
 
 <template>
   <Navbar />
-  <div class="max-w-7xl mx-auto p-4 md:p-6 h-[calc(100vh-80px)]">
+  <div class="max-w-7xl mx-auto p-4 md:p-6 h-[calc(100vh-80px)] relative">
     
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center justify-between mb-4 relative z-10">
         <button @click="goBack" class="text-gray-600 hover:text-yellow-600 font-medium flex items-center gap-2">
             &larr; {{ props.mode === 'group' ? 'Rời phòng nhóm' : 'Quay lại' }}
         </button>
@@ -144,9 +168,18 @@ function goBack() { router.back(); }
         </div>
     </div>
 
+    <!-- LAYER EMOJI -->
+    <div class="absolute inset-0 pointer-events-none overflow-hidden z-50">
+        <div v-for="emoji in floatingEmojis" :key="emoji.id"
+             class="absolute bottom-10 text-4xl animate-float opacity-0 select-none"
+             :style="{ left: emoji.left }">
+            {{ emoji.type }}
+        </div>
+    </div>
+
     <div v-if="loading" class="text-center py-10">Đang tải...</div>
 
-    <div v-else class="grid gap-6 h-full pb-10" 
+    <div v-else class="grid gap-6 h-full pb-10 relative z-10" 
          :class="props.mode === 'group' ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1 max-w-4xl mx-auto'">
         
         <div class="flex flex-col h-full" :class="props.mode === 'group' ? 'lg:col-span-2' : 'w-full'">
@@ -161,6 +194,7 @@ function goBack() { router.back(); }
                 @player-control="handlePlayerControl"
                 @status-change="handleStatusChange"
                 @progress-change="handleProgressChange"
+                @send-reaction="handleReaction"
             />
         </div>
 
@@ -187,3 +221,14 @@ function goBack() { router.back(); }
     </div>
   </div>
 </template>
+
+<style scoped>
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  50% { opacity: 0.8; }
+  100% { transform: translateY(-300px) scale(1.5); opacity: 0; }
+}
+.animate-float {
+  animation: floatUp 2s ease-out forwards;
+}
+</style>
