@@ -3,7 +3,8 @@ import { Ref, ref } from "vue";
 import { useBookSearch } from "../../../composables/useBookSearch";
 import { BOOK_SERVICE_URL } from "../../../config";
 import axios from "axios";
-import { useAuth } from "../../../composables/useAuth"; // <-- 1. THÊM IMPORT
+import { useAuth } from "../../../composables/useAuth";
+import { USER_SERVICE_URL } from "../../../config";
 
 const props = defineProps<{ clubId: number }>();
 const emit = defineEmits(["created", "cancel"]);
@@ -62,9 +63,13 @@ async function createMeeting() {
       formData.append("book_id", String(selectedBook.value.id));
     }
 
-    await axios.post(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}/meetings`, formData, {
+    const res = await axios.post(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}/meetings`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
+
+    if (res.data && res.data.id) {
+        notifyClubMembers(title.value, res.data.id);
+    }
 
     alert("Tạo cuộc họp thành công!");
     emit("created");
@@ -73,6 +78,37 @@ async function createMeeting() {
     // Hiển thị lỗi chính xác từ backend
     alert(error.response?.data?.detail || "Tạo cuộc họp thất bại, vui lòng thử lại!");
   }
+}
+
+async function notifyClubMembers(meetingTitle: string, meetingId: number) {
+  try {
+    // 1. Lấy danh sách thành viên
+    const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}/members`);
+    const members = res.data;
+    
+    // 2. Lấy tên CLB (để hiển thị trong thông báo)
+    const clubRes = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}`);
+    const clubName = clubRes.data.name;
+
+    const currentUserId = userInfo.value?.id || userInfo.value?.user_id;
+
+    // 3. Gửi thông báo cho từng người (trừ mình)
+    for (const member of members) {
+        if (member.user_id === currentUserId) continue;
+        
+        axios.post(`${USER_SERVICE_URL}notifications/add`, {
+            receiver_id: member.user_id,
+            sender_id: currentUserId,
+            type: 'club_meeting',
+            message: JSON.stringify({
+                title: meetingTitle,
+                clubName: clubName,
+                meetingId: meetingId
+            }),
+            status: 'unread'
+        }).catch(e => console.error("Lỗi gửi notif:", e));
+    }
+  } catch (e) { console.error("Lỗi logic notif:", e); }
 }
 </script>
 

@@ -11,6 +11,7 @@ import BookProgress from "../components/books/BookProgress.vue";
 import BookStatusSelect from "../components/books/BookStatusSelect.vue";
 import CharacterChatModal from "../components/books/CharacterChatModal.vue";
 import BookQuotes from "../components/books/BookQuotes.vue";
+import RecommendBookModal from "../components/books/RecommendBookModal.vue";
 
 const { fetchBook, formatDate, toggleFavoriteStatus, getUserBookStatus, updateReadingDates } = useBooks();
 const route = useRoute();
@@ -21,7 +22,7 @@ const error = ref<string | null>(null);
 const bookId = Number(route.params.id);
 const currentStatus = ref<{ value: string; label: string } | null>(null);
 const userInfo = ref<any>(null);
-
+const showRecommendModal = ref(false);
 const friendActivity = ref<any[]>([]);
 const loadingFriends = ref(true);
 const friendError = ref<string | null>(null);
@@ -496,6 +497,10 @@ function handleProgressAutoUpdate(newPages: number) {
               {{ book.is_favorite ? '💛 Đã yêu thích' : '💛 Thêm vào danh sách yêu thích' }}
             </span>
           </button>
+          <button v-if="userInfo" @click="showRecommendModal = true"
+            class="w-full py-1.5 rounded border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 text-sm font-semibold transition mt-2 flex items-center justify-center gap-2">
+            🎁 Gửi cho bạn bè
+          </button>
 
           <router-link v-if="book && book.audios && book.audios.length > 0"
             :to="{ name: 'PersonalAudioBook', params: { id: bookId } }"
@@ -545,4 +550,14 @@ function handleProgressAutoUpdate(newPages: number) {
     </div>
 
   </div>
+
+  <transition name="fade">
+    <RecommendBookModal 
+        v-if="showRecommendModal" 
+        :bookId="bookId" 
+        :bookTitle="book?.title || ''"
+        @close="showRecommendModal = false" 
+    />
+</transition>
+
 </template>

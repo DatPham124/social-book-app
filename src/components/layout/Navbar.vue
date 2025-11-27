@@ -5,6 +5,8 @@ import { jwtDecode } from "jwt-decode"
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import { AVATAR_SERVER_URL, USER_SERVICE_URL } from '../../config'
 import axios from "axios"
+// 1. Import Component Mới
+import NotificationDropdown from './NotificationDropdown.vue'; 
 
 interface TokenPayLoad {
     username: string
@@ -70,59 +72,63 @@ onMounted(async () => {
 })
 </script>
 
-
-
 <template>
-    <nav class="bg-white shadow-md">
+    <nav class="bg-white shadow-md relative z-50"> <!-- Thêm z-50 để dropdown đè lên -->
         <div class="mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16 items-center mx-10">
                 <div class="flex space-x-8 item-center">
-                    <h1 class="text-2xl font-logo text-yellow-500 item-center">📚 Social Book</h1>
+                    <h1 class="text-2xl font-logo text-yellow-500 item-center cursor-pointer" @click="router.push('/home')">📚 Social Book</h1>
 
                     <div v-if="userInfo" class="hidden md:flex space-x-6 items-center">
-                        <router-link to="/home" class="text-gray-700 hover:text-yellow-500">Trang chủ</router-link>
+                        <router-link to="/home" class="text-gray-700 hover:text-yellow-500 font-medium">Trang chủ</router-link>
 
                         <router-link :to="{ name: 'StatisticsTab', params: { id: userInfo.user_id } }"
-                            class="text-gray-700 hover:text-yellow-500">Thống kê
+                            class="text-gray-700 hover:text-yellow-500 font-medium">Thống kê
                         </router-link>
 
-                        <router-link :to="{ name: 'Recommendations' }" class="text-gray-700 hover:text-yellow-500">
+                        <router-link :to="{ name: 'Recommendations' }" class="text-gray-700 hover:text-yellow-500 font-medium">
                             Gợi ý AI
                         </router-link>
 
-                        <router-link :to="{ name: 'Challenge' }" class="text-gray-700 hover:text-yellow-500">
+                        <router-link :to="{ name: 'Challenge' }" class="text-gray-700 hover:text-yellow-500 font-medium">
                             Thử thách
                         </router-link>
 
-                        <router-link to="/community" class="text-gray-700 hover:text-yellow-500">Cộng đồng</router-link>
-                        <router-link to="/friends" class="text-gray-700 hover:text-yellow-500">Bạn bè</router-link>
+                        <router-link to="/community" class="text-gray-700 hover:text-yellow-500 font-medium">Cộng đồng</router-link>
+                        <router-link to="/friends" class="text-gray-700 hover:text-yellow-500 font-medium">Bạn bè</router-link>
 
+                        <!-- Search Bar -->
                         <div class="relative">
                             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 cursor-pointer"
                                 @click="handleSearch">
                                 <font-awesome-icon icon="fa-solid fa-magnifying-glass" />
                             </span>
 
-                            <input type="text" placeholder="Tìm kiếm sách, bạn bè..."
-                                class="pl-10 border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-yellow-500 w-full"
+                            <input type="text" placeholder="Tìm kiếm..."
+                                class="pl-10 border border-gray-300 rounded-full px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-48 transition-all focus:w-64"
                                 v-model="searchQuery" @keydown.enter="handleSearch">
                         </div>
                     </div>
                 </div>
 
-                <div v-if="userInfo" class="relative">
-                    <Menu as="div">
+                <div v-if="userInfo" class="flex items-center gap-4">
+                    
+                    <!-- 2. THÊM NOTIFICATION DROPDOWN VÀO ĐÂY -->
+                    <NotificationDropdown />
+                    <!-- ------------------------------------- -->
+
+                    <Menu as="div" class="relative">
                         <MenuButton
                             class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
                             <span class="sr-only">Open user menu</span>
 
                             <img v-if="profile && profile.avatar_url"
                                 :src="`${AVATAR_SERVER_URL}/${profile.avatar_url}`" alt="avatar"
-                                class="w-10 h-10 rounded-full border border-gray-300 object-cover">
+                                class="w-9 h-9 rounded-full border border-gray-300 object-cover">
 
                             <div v-else
-                                class="w-10 h-10 rounded-full border border-gray-300 bg-yellow-400 flex items-center justify-center">
-                                <span class="text-xl font-semibold text-white">
+                                class="w-9 h-9 rounded-full border border-gray-300 bg-yellow-400 flex items-center justify-center">
+                                <span class="text-lg font-semibold text-white">
                                     {{ userInfo.username?.charAt(0).toUpperCase() }}
                                 </span>
                             </div>
@@ -152,10 +158,11 @@ onMounted(async () => {
                                     Thử thách đọc sách
                                 </router-link>
                                 </MenuItem>
+                                <!-- Đã có Dropdown nên có thể bỏ dòng này hoặc giữ làm trang chi tiết -->
                                 <MenuItem v-slot="{ active }">
                                 <router-link :to="{ name: 'Notification' }"
                                     :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
-                                    Thông báo
+                                    Xem tất cả thông báo
                                 </router-link>
                                 </MenuItem>
                                 <MenuItem v-slot="{ active }">
@@ -175,7 +182,7 @@ onMounted(async () => {
                     </Menu>
                 </div>
                 <div v-else>
-                    <router-link to="/login" class="text-gray-700 hover:text-yellow-500">Đăng nhập</router-link>
+                    <router-link to="/login" class="text-gray-700 hover:text-yellow-500 font-medium">Đăng nhập</router-link>
                 </div>
             </div>
         </div>

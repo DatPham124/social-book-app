@@ -3,7 +3,7 @@ import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { useAuth } from '../../composables/useAuth';
 import { getProfile } from '../../composables/useProfile';
-import { BOOK_SERVICE_URL, AVATAR_SERVER_URL } from '../../config';
+import { BOOK_SERVICE_URL, AVATAR_SERVER_URL, USER_SERVICE_URL } from '../../config';
 
 const props = defineProps<{
     bookId: number | string;
@@ -88,10 +88,14 @@ async function fetchQuotes(reset = false) {
 }
 
 async function handleLike(quote: any) {
-    if (!userInfo.value) return alert("Vui lòng đăng nhập!");
-    const previousLiked = quote.is_liked;
+    if (!userInfo.value) {
+        alert("Vui lòng đăng nhập để thả tim!");
+        return;
+    }
     
-    // Optimistic UI
+    const isLiking = !quote.is_liked;
+
+    const previousLiked = quote.is_liked;
     quote.is_liked = !quote.is_liked;
     quote.likes += quote.is_liked ? 1 : -1;
 
@@ -99,6 +103,24 @@ async function handleLike(quote: any) {
         await axios.post(`${BOOK_SERVICE_URL}quotes/${quote.id}/like`, {
             current_user_id: userInfo.value.user_id
         });
+
+        if (isLiking && quote.user_id !== userInfo.value.user_id) {
+            try {
+                await axios.post(`${USER_SERVICE_URL}notifications/add`, {
+                    receiver_id: quote.user_id, 
+                    sender_id: userInfo.value.user_id,
+                    type: 'quote_like',
+                    message: JSON.stringify({
+                        bookTitle: props.bookTitle,
+                        quoteContent: quote.text.substring(0, 30) + (quote.text.length > 30 ? '...' : '')
+                    }),
+                    status: 'unread'
+                });
+            } catch (err) {
+                console.error("Lỗi gửi thông báo like:", err);
+            }
+        }
+
     } catch (e) {
         quote.is_liked = previousLiked;
         quote.likes += quote.is_liked ? 1 : -1;

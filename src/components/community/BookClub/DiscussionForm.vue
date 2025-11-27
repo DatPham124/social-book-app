@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import axios from "axios";
-import { BOOK_SERVICE_URL } from "../../../config";
+import { BOOK_SERVICE_URL, USER_SERVICE_URL } from "../../../config";
 import { useAuth } from "../../../composables/useAuth";
+
 
 const props = defineProps<{ clubId: number }>();
 const emit = defineEmits(["created", "cancel"]);
@@ -31,11 +32,15 @@ async function createDiscussion() {
     formData.append("content", content.value);
     formData.append("user_id", String(userId));
 
-    await axios.post(
+    const res = await axios.post(
       `${BOOK_SERVICE_URL}bookclubs/${props.clubId}/discussion`, 
       formData,
       { headers: { "Content-Type": "multipart/form-data" } }
     );
+
+    if (res.data && res.data.id) {
+        notifyDiscussion(title.value, res.data.id);
+    }
     
     emit("created");
     
@@ -44,6 +49,32 @@ async function createDiscussion() {
   } finally {
     loading.value = false;
   }
+}
+
+async function notifyDiscussion(discussionTitle: string, discussionId: number) {
+  try {
+    const res = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}/members`);
+    const members = res.data;
+    const clubRes = await axios.get(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}`);
+    const clubName = clubRes.data.name;
+    const currentUserId = userInfo.value?.id || userInfo.value?.user_id;
+
+    for (const member of members) {
+        if (member.user_id === currentUserId) continue;
+        
+        axios.post(`${USER_SERVICE_URL}notifications/add`, {
+            receiver_id: member.user_id,
+            sender_id: currentUserId,
+            type: 'club_discussion',
+            message: JSON.stringify({
+                title: discussionTitle,
+                clubName: clubName,
+                discussionId: discussionId
+            }),
+            status: 'unread'
+        }).catch(e => console.error("Lỗi notif discussion:", e));
+    }
+  } catch (e) { console.error(e); }
 }
 </script>
 

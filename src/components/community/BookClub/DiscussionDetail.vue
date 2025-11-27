@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, Ref } from "vue";
 import axios from "axios";
-import { BOOK_SERVICE_URL, AVATAR_SERVER_URL } from "../../../config";
+import { BOOK_SERVICE_URL, AVATAR_SERVER_URL, USER_SERVICE_URL } from "../../../config";
 import { useAuth } from "../../../composables/useAuth";
 import { getProfile } from "../../../composables/useProfile";
 import { useRoute, useRouter } from "vue-router";
@@ -87,6 +87,22 @@ async function postComment() {
       `${BOOK_SERVICE_URL}bookclubs/discussion/${discussionId}/comment`, 
       formData
     );
+
+    if (discussion.value && discussion.value.user_id !== userId) {
+        const shortContent = newComment.value.length > 30 ? newComment.value.substring(0, 30) + '...' : newComment.value;
+        
+        axios.post(`${USER_SERVICE_URL}notifications/add`, {
+            receiver_id: discussion.value.user_id, // Gửi cho chủ bài viết
+            sender_id: userId,
+            type: 'club_comment',
+            message: JSON.stringify({
+                discussionTitle: discussion.value.title,
+                content: shortContent,
+                discussionId: discussionId
+            }),
+            status: 'unread'
+        });
+    }
     
     newComment.value = "";
     await loadComments(); 
