@@ -508,6 +508,15 @@ function handleProgressAutoUpdate(newPages: number) {
             <span>🎧</span> Nghe Sách Ngay
           </router-link>
 
+          <!-- [MỚI] NÚT ĐỌC EBOOK -->
+          <router-link 
+            :to="{ name: 'ReadEbook', params: { id: bookId } }"
+            class="w-full py-2 mt-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md transition flex justify-center items-center gap-2"
+          >
+            <span>📄</span> Đọc Ebook
+          </router-link>
+          <!-- -------------------- -->
+
           <router-link :to="{ name: 'ImmersiveRead', params: { id: bookId } }"
             class="block w-full py-2 mt-2 rounded border text-sm text-center font-bold transition-colors duration-200 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100">
             📖 Vào Phòng Đọc (Focus Mode)

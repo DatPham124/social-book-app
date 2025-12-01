@@ -41,6 +41,7 @@ import AudioBook from "../views/AudioBook.vue";
 
 import ImmersiveRead from "../views/ImmersiveRead.vue";
 
+import ReadEbook from "../views/ReadEbook.vue"
 
 const routes = [
   { path: "/login", name: "Login", component: Login },
@@ -178,6 +179,15 @@ const routes = [
     component: ImmersiveRead,
     meta: { requiresAuth: true },
   },
+
+  {
+    path: "/read/:id",
+    name: "ReadEbook",
+    component: ReadEbook,
+    meta: { requiresAuth: true },
+  },
+
+  
 
   { path: "/", redirect: "/login" },
 ];
