@@ -220,7 +220,7 @@ def update_book(book_id: int, book_data: Books, session: Session = Depends(get_s
     if book is None:
         raise HTTPException(status_code=404, detail='No book found')
     
-    update_fields = ["title", "description", "cover_url", "published_date", "language", "authorID", "page_count", "audio_url"]
+    update_fields = ["title", "description", "cover_url", "published_date", "language", "authorID", "page_count", "file_url"]
     for field in update_fields:
         value = getattr(book_data, field)
         if value is not None:

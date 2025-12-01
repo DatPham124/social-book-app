@@ -27,6 +27,7 @@ class Books(SQLModel, table=True):
     authorID: Optional[int] = Field(foreign_key="authors.id")
     created_at: date = Field(default_factory=date.today)
     categories: List[Category] = Relationship(back_populates="books", link_model=BookCategoryLink)
+    file_url: Optional[str] = None
 
 class Authors(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
