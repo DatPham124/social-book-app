@@ -1,6 +1,6 @@
 from fastapi import Depends, FastAPI
 from common_lib.database import  engine_book_service
-from .routes import books, author, category, bookclub, buddyread, filter, stats, ai, challenge, quote
+from .routes import books, author, category, bookclub, buddyread, filter, stats, ai, challenge, quote, annotations
 from sqlmodel import SQLModel
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
@@ -11,7 +11,7 @@ from .model import (
     UserBookStatus, ReadingProgress, BookClub, BookClubMember,
     BookClubBook, BookClubDiscussion, BookClubComment, BookClubMeeting,
     InviteStatus, BookClubInvitation, BuddyRead, BuddyReadMember,
-    BuddyReadComment, BuddyReadInvitation, AnnualChallenge,
+    BuddyReadComment, BuddyReadInvitation, AnnualChallenge
 )
 
 app = FastAPI()
@@ -49,3 +49,5 @@ app.include_router(stats.router)
 app.include_router(ai.router)
 app.include_router(challenge.router) 
 app.include_router(quote.router) 
+app.include_router(annotations.router) 
+

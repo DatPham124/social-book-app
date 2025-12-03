@@ -235,3 +235,18 @@ class BookQuoteLike(SQLModel, table=True):
     
     # Quan hệ
     quote: "BookQuote" = Relationship(back_populates="likes")
+
+
+class UserBookAnnotation(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True, nullable=False)
+    book_id: int = Field(foreign_key="books.id", index=True, nullable=False)
+    
+    cfi_range: str = Field(nullable=False) 
+    text_content: str = Field(nullable=True) 
+    note_content: Optional[str] = None
+    
+    type: str = Field(default="highlight")
+    color: str = Field(default="yellow")
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)

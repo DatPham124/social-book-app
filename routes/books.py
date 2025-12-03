@@ -14,7 +14,7 @@ from pathlib import Path
 from ..model import (
     BookStatus, Books, Category, ReadingProgress, UserBookStatus, BookCategoryLink, Authors,
     AiSummaryCache, BuddyRead, BuddyReadMember, BuddyReadComment, BuddyReadInvitation,
-    BookClubBook, BookAudio
+    BookClubBook, BookAudio, UserBookAnnotation
 )
 from common_lib.database import get_session_book_service
 
