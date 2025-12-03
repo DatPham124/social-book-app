@@ -77,8 +77,10 @@ onMounted(() => {
         <!-- 1. TRÌNH ĐỌC EPUB (Vẫn giữ nguyên vì trình duyệt không đọc được EPUB) -->
         <EpubReader 
             v-else-if="bookFormat === 'epub' && bookUrl" 
-            :url="bookUrl" 
+            :url="bookUrl"
+            :bookId="bookId"
             @close="router.back()"
+
         />
 
         <!-- 2. TRÌNH ĐỌC PDF (NATIVE BROWSER VIEWER) -->
