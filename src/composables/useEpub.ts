@@ -1,158 +1,208 @@
-import { ref, nextTick } from 'vue';
+import { ref } from 'vue';
 import ePub, { Book, Rendition } from 'epubjs';
 
+// Định nghĩa kiểu dữ liệu cho Annotation (Giúp code chặt chẽ hơn dùng 'any')
+interface AnnotationItem {
+    id: number | string;
+    cfi_range: string;
+    type: 'highlight' | 'note';
+    text_content?: string;
+    color?: string;
+}
+
 export function useEpub() {
+    // --- STATE QUẢN LÝ ---
     const book = ref<Book | null>(null);
     const rendition = ref<Rendition | null>(null);
     const isReady = ref(false);
-    const toc = ref<any[]>([]);
-    
-    // --- KHỞI TẠO ---
+    const toc = ref<any[]>([]); // Table of Contents
+
+    // --- 1. KHỞI TẠO SÁCH (CORE) ---
     const initEpub = async (url: string, element: HTMLElement) => {
-        console.log("📚 Init Epub với URL:", url);
+        console.group("📚 [Epub System] Khởi tạo sách");
+        
         if (!url || !element) {
-            console.warn("❌ URL hoặc Element thiếu!");
+            console.error("❌ Thiếu URL hoặc DOM Element");
+            console.groupEnd();
             return null;
         }
-        if (book.value) book.value.destroy();
+
+        // Hủy instance cũ để tránh rò rỉ bộ nhớ khi user mở sách khác
+        if (book.value) {
+            console.log("♻️ Cleanup sách cũ...");
+            book.value.destroy();
+        }
         isReady.value = false;
 
         try {
+            // Khởi tạo đối tượng Book từ thư viện epubjs
             book.value = ePub(url);
+            
+            // Render sách vào thẻ div (element)
             rendition.value = book.value.renderTo(element, {
                 width: '100%',
                 height: '100%',
-                flow: 'paginated',
+                flow: 'paginated', // Chế độ lật trang (quan trọng cho trải nghiệm đọc)
                 manager: 'default',
             });
 
-            // Load Mục lục
+            // Đợi load xong mục lục (Navigation)
             const nav = await book.value.loaded.navigation;
             toc.value = nav.toc;
-            console.log("✅ Epub Init thành công, TOC:", nav.toc.length);
+            
+            console.log(`✅ Đã tải xong. Số chương: ${nav.toc.length}`);
+            console.groupEnd();
 
             return rendition.value;
         } catch (e) {
             console.error("❌ Lỗi khởi tạo sách:", e);
+            console.groupEnd();
             return null;
         }
     };
 
-    // --- HIỂN THỊ & ĐIỀU HƯỚNG ---
+    // --- 2. ĐIỀU HƯỚNG (NAVIGATION) ---
+    
     const displayBook = async (location?: string) => {
         if (!rendition.value) return;
         try {
+            // Nếu có location (cfi/href) thì nhảy tới, không thì mở trang đầu
             await rendition.value.display(location);
             isReady.value = true;
-            console.log("📖 Hiển thị sách tại:", location || "trang đầu");
         } catch (err) {
-            console.warn("⚠️ Lỗi hiển thị location, fallback về đầu trang.", err);
-            await rendition.value.display(); // Fallback về trang đầu
+            console.warn("⚠️ Vị trí không hợp lệ, quay về trang đầu.");
+            await rendition.value.display();
             isReady.value = true;
         }
     };
 
     const prevPage = () => rendition.value?.prev();
     const nextPage = () => rendition.value?.next();
-    const goToChapter = (href: string) => rendition.value?.display(href);
-    const goToCfi = (cfi: string) => rendition.value?.display(cfi);
+    
+    const goToChapter = (href: string) => {
+        console.log("📑 Chuyển chương:", href);
+        rendition.value?.display(href);
+    };
 
-    // --- GIAO DIỆN & THEME ---
+    const goToCfi = (cfi: string) => {
+        console.log("📍 Nhảy tới vị trí (CFI):", cfi);
+        rendition.value?.display(cfi);
+    };
+
+    // --- 3. GIAO DIỆN & CSS INJECTION (QUAN TRỌNG) ---
+    
+    /**
+     * Hàm này can thiệp vào Iframe của sách để:
+     * 1. Đổi font/size/màu nền.
+     * 2. [CỰC QUAN TRỌNG] Bật tính năng 'user-select' để cho phép bôi đen văn bản.
+     */
     const setStyle = (settings: { 
-        fontSize: number; 
-        fontName: string; 
-        bg: string; 
-        color: string; 
-        lineHeight: number 
+        fontSize: number; fontName: string; bg: string; color: string; lineHeight: number 
     }) => {
         if (!rendition.value) return;
 
-        // 1. Dùng API chuẩn
+        // API chuẩn của EpubJS
         rendition.value.themes.font(settings.fontName);
         rendition.value.themes.fontSize(settings.fontSize + "%");
 
-        // 2. Override Styles
+        // Inject CSS trực tiếp (Override style mặc định của sách)
         rendition.value.themes.default({    
             'body': { 
                 'color': `${settings.color} !important`, 
                 'background': `${settings.bg} !important`,
-                'padding': '10px !important'
+                'padding': '0 20px !important', // Tạo lề cho dễ đọc
+                
+                // BẮT BUỘC: Cho phép chọn văn bản (mặc định epub chặn cái này)
+                '-webkit-user-select': 'text !important', 
+                'user-select': 'text !important',         
+                'cursor': 'auto !important'
             },
             'p': {
                 'font-family': `${settings.fontName} !important`, 
                 'line-height': `${settings.lineHeight} !important`,
                 'font-size': `${settings.fontSize}% !important`,
-                'text-align': 'justify !important'
+                'text-align': 'justify !important',
+                // BẮT BUỘC cho thẻ P
+                '-webkit-user-select': 'text !important', 
+                'user-select': 'text !important'
+            },
+            // Màu khi bôi đen (Selection)
+            '::selection': {
+                'background': 'rgba(66, 135, 245, 0.3)' 
+            },
+            // Style cho Highlight đã lưu
+            '.highlight-default': {
+                'fill': 'yellow',
+                'fill-opacity': '0.3',
+                'mix-blend-mode': 'multiply',
+                'cursor': 'pointer' // Hiện bàn tay khi hover vào highlight
+            },
+            '.highlight-default:hover': {
+                'fill-opacity': '0.5',
             }
         });
-
-        // 3. Hack: Inject thẳng vào iframe để chắc chắn ăn style (cho body/p)
-        const views = (rendition.value as any).getContents();
-        if (views) {
-            views.forEach((view: any) => {
-               if(view.document) {
-                    view.document.body.style.fontFamily = settings.fontName;
-                    view.document.body.style.lineHeight = settings.lineHeight;
-                    view.document.body.style.fontSize = settings.fontSize + "%";
-                    view.document.body.style.color = settings.color;
-                    view.document.body.style.backgroundColor = settings.bg;
-               }
-            });
-        }
     };
 
-    // Resize & Chế độ xem
     const resizeBook = (width: number, height: number, viewMode: 'single' | 'double') => {
         if (!rendition.value || width === 0 || height === 0) return;
-
         rendition.value.resize(width, height);
-        if (viewMode === 'single') rendition.value.spread("none");
-        else rendition.value.spread("auto");
-        rendition.value.flow("paginated");
+        // spread('none') = 1 trang, spread('auto') = 2 trang (nếu đủ rộng)
+        rendition.value.spread(viewMode === 'single' ? "none" : "auto");
     };
 
-    // --- QUẢN LÝ ANNOTATIONS ---
-    const drawAnnotations = (highlights: any[], notes: any[]) => {
-        console.group("🖊️ Draw Annotations (Simple Yellow)");
-        
-        if (!rendition.value) {
-            console.error("❌ Rendition chưa sẵn sàng!");
-            console.groupEnd();
-            return;
-        }
+    // --- 4. QUẢN LÝ HIGHLIGHT & NOTES ---
 
+    const drawAnnotations = (highlights: AnnotationItem[], notes: AnnotationItem[]) => {
+        if (!rendition.value) return;
+
+        console.log(`🖊️ Vẽ lại ${highlights.length} highlight và ${notes.length} note.`);
         const annotations = rendition.value.annotations;
-        const allItems = highlights.concat(notes);
+        
+        // Gộp chung để xử lý
+        const allItems = [...highlights, ...notes];
 
-        // 1. Xóa Annotations cũ
+        // Bước 1: Xóa các highlight cũ đang hiển thị (để tránh vẽ đè lên nhau)
         allItems.forEach(item => {
-            try { annotations.remove(item.cfi_range, 'highlight'); } catch (e) { }
+            try { 
+                annotations.remove(item.cfi_range, 'highlight'); 
+            } catch (e) { /* Bỏ qua lỗi nếu chưa tồn tại */ }
         });
 
-        // 2. Vẽ mới (Tất cả đều màu vàng mặc định)
-        allItems.forEach((item, index) => {
+        // Bước 2: Vẽ lại danh sách mới nhất
+        allItems.forEach((item) => {
             try {
-                // Truyền object rỗng {} vào tham số data.
-                // epub.js sẽ tự động sử dụng class mặc định (thường là màu vàng).
                 annotations.add(
                     'highlight', 
                     item.cfi_range, 
-                    { type: item.type }, // Metadata (không ảnh hưởng hiển thị)
+                    // Truyền data vào để khi click có thể lấy lại ID
+                    { id: item.id, type: item.type, text_content: item.text_content }, 
                     undefined, 
-                    'highlight-default'
+                    'highlight-default' // Class CSS đã định nghĩa ở setStyle
                 );
-                console.log(`✅ Item #${index} vẽ thành công.`);
             } catch (e) {
-                console.error(`❌ Lỗi vẽ ${item.cfi_range}:`, e);
+                console.warn(`Lỗi vẽ item ID ${item.id}`, e);
             }
         });
-        
-        console.groupEnd();
+    };
+
+    const removeAnnotationByCfi = (cfiRange: string) => {
+        if (!rendition.value) return;
+        try {
+            // Xóa trực tiếp trên UI (không cần reload API) -> Tăng trải nghiệm người dùng
+            rendition.value.annotations.remove(cfiRange, "highlight");
+            console.log("🗑️ Đã xóa visual highlight:", cfiRange);
+        } catch (e) {
+            console.error("Lỗi xóa highlight visual:", e);
+        }
     };
 
     return {
+        // State
         book, rendition, isReady, toc,
-        initEpub, displayBook, prevPage, nextPage, goToChapter, goToCfi,
-        setStyle, resizeBook, drawAnnotations
+        // Methods
+        initEpub, displayBook, 
+        prevPage, nextPage, goToChapter, goToCfi,
+        setStyle, resizeBook, 
+        drawAnnotations, removeAnnotationByCfi
     };
 }
