@@ -68,8 +68,8 @@ class ReadingProgress(SQLModel, table=True):
 class BookClub(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    description: Optional[str] = None
-    rules: Optional[str] = None
+    description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    rules: Optional[str] = Field(default=None, sa_column=Column(Text))
     creator_id: int = Field(index=True)
     is_public: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, File
-from sqlmodel import Session, func, select
+from sqlmodel import Session, func, select, delete
 from datetime import datetime
 from typing import List, Optional
 import requests, os
@@ -173,21 +173,41 @@ def update_bookclub(
 
 
 @router.delete("/{club_id}")
-def delete_bookclub(club_id: int, user_id: int = Form(...), session: Session = Depends(get_session_book_service)):
+def delete_bookclub(
+    club_id: int, 
+    user_id: int, 
+    session: Session = Depends(get_session_book_service)
+):
     club = session.get(BookClub, club_id)
     if not club:
         raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
+    
     if club.creator_id != user_id:
         raise HTTPException(status_code=403, detail="Chỉ người tạo club mới có quyền này")
+    
     if club.avatar_url:
         try:
             filename = os.path.basename(club.avatar_url)
             requests.delete(f"{FILE_SERVER_API}/upload/club/{filename}")
         except Exception:
             pass
-        
+            
+    
+    session.exec(delete(BookClubInvitation).where(BookClubInvitation.club_id == club_id))
+
+    session.exec(delete(BookClubMember).where(BookClubMember.club_id == club_id))
+
+    session.exec(delete(BookClubMeeting).where(BookClubMeeting.club_id == club_id))
+
+    discussions = session.exec(select(BookClubDiscussion).where(BookClubDiscussion.club_id == club_id)).all()
+    for disc in discussions:
+        session.exec(delete(BookClubComment).where(BookClubComment.discussion_id == disc.id))
+        session.delete(disc)
+    
+
     session.delete(club)
     session.commit()
+    
     return {"message": "Đã xóa câu lạc bộ"}
 
 
@@ -394,6 +414,8 @@ def list_meetings(club_id: int, session: Session = Depends(get_session_book_serv
         select(BookClubMeeting).where(BookClubMeeting.club_id == club_id)
     ).all()
 
+# Trong file bookclub.py
+
 @router.post("/{club_id}/meetings")
 def create_meeting(
     club_id: int,
@@ -401,6 +423,7 @@ def create_meeting(
     date: datetime = Form(...),
     book_id: Optional[int] = Form(None),
     user_id: int = Form(...),
+    agenda: str = Form(""), # <--- 1. THÊM DÒNG NÀY (Mặc định là rỗng)
     session: Session = Depends(get_session_book_service)
 ):
     club = session.get(BookClub, club_id)
@@ -409,7 +432,17 @@ def create_meeting(
     if club.creator_id != user_id:
         raise HTTPException(status_code=403, detail="Chỉ người tạo club mới có quyền này")
 
-    meeting = BookClubMeeting(club_id=club_id, title=title, date=date, book_id=book_id)
+    # Kiểm tra thời gian (Optional - nếu bạn muốn giữ logic chặn ở backend)
+    if date < datetime.utcnow():
+         raise HTTPException(status_code=400, detail="Thời gian họp không hợp lệ")
+
+    meeting = BookClubMeeting(
+        club_id=club_id, 
+        title=title, 
+        date=date, 
+        book_id=book_id,
+        agenda=agenda # <--- 2. LƯU AGENDA VÀO DATABASE
+    )
     session.add(meeting)
     session.commit()
     session.refresh(meeting) 
@@ -646,3 +679,42 @@ def get_club_members(
     statement = select(BookClubMember).where(BookClubMember.club_id == club_id)
     members = session.exec(statement).all()
     return members
+
+# Thêm vào bookclub.py
+
+@router.delete("/{club_id}/members/{target_user_id}")
+def remove_member_from_club(
+    club_id: int,
+    target_user_id: int,
+    requester_id: int = Form(...), # ID của người thực hiện (phải là Host)
+    session: Session = Depends(get_session_book_service)
+):
+    # 1. Kiểm tra CLB tồn tại
+    club = session.get(BookClub, club_id)
+    if not club:
+        raise HTTPException(status_code=404, detail="Không tìm thấy câu lạc bộ")
+
+    # 2. Kiểm tra quyền hạn: Chỉ Host mới được kick
+    if club.creator_id != requester_id:
+        raise HTTPException(status_code=403, detail="Chỉ Host mới có quyền xóa thành viên")
+
+    # 3. Không cho phép Host tự kick chính mình (Host phải dùng chức năng xóa CLB)
+    if target_user_id == club.creator_id:
+        raise HTTPException(status_code=400, detail="Không thể xóa Host khỏi câu lạc bộ")
+
+    # 4. Tìm thành viên cần xóa
+    member_record = session.exec(
+        select(BookClubMember).where(
+            BookClubMember.club_id == club_id,
+            BookClubMember.user_id == target_user_id
+        )
+    ).first()
+
+    if not member_record:
+        raise HTTPException(status_code=404, detail="Thành viên không tồn tại trong câu lạc bộ")
+
+    # 5. Xóa thành viên
+    session.delete(member_record)
+    session.commit()
+
+    return {"message": "Đã xóa thành viên khỏi câu lạc bộ"}

@@ -284,3 +284,40 @@ def leave_buddy_read(
     
     return {"message": "Rời khỏi phòng đọc thành công"}
 
+@router.delete("/{buddy_read_id}/members/{target_user_id}")
+def remove_member_from_buddy_read(
+    buddy_read_id: int,
+    target_user_id: int,
+    requester_id: int = Form(...), # ID người thực hiện (phải là Creator)
+    session: Session = Depends(get_session_book_service)
+):
+    # 1. Kiểm tra Buddy Read tồn tại
+    buddy_read = session.get(BuddyRead, buddy_read_id)
+    if not buddy_read:
+        raise HTTPException(status_code=404, detail="Không tìm thấy phòng đọc")
+
+    # 2. Kiểm tra quyền hạn: Chỉ Creator mới được kick
+    if buddy_read.created_by_user_id != requester_id:
+        raise HTTPException(status_code=403, detail="Chỉ người tạo phòng mới có quyền xóa thành viên")
+
+    # 3. Không cho phép Creator tự kick chính mình
+    if target_user_id == buddy_read.created_by_user_id:
+        raise HTTPException(status_code=400, detail="Không thể xóa chủ phòng")
+
+    # 4. Tìm thành viên cần xóa
+    member_record = session.exec(
+        select(BuddyReadMember).where(
+            BuddyReadMember.buddy_read_id == buddy_read_id,
+            BuddyReadMember.user_id == target_user_id
+        )
+    ).first()
+
+    if not member_record:
+        raise HTTPException(status_code=404, detail="Thành viên không tồn tại trong phòng đọc")
+
+    # 5. Xóa thành viên
+    session.delete(member_record)
+    session.commit()
+
+    return {"message": "Đã xóa thành viên khỏi phòng đọc"}
+
