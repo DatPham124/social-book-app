@@ -100,23 +100,13 @@ def update_avatar(
     current_user: User = Depends(auth.get_current_active_user),
     file: UploadFile = File(...)
 ):
-    # 1. In ra để kiểm tra xem URL có đúng không
-    print(f"DEBUG: Đang gửi ảnh đến: {FILE_SERVER_API}/upload/avatar")
-
     try:
         response = requests.post(
             f"{FILE_SERVER_API}/upload/avatar",
             files={"file": (file.filename, file.file, file.content_type)}
         )
-        
-        # 2. IN RA NỘI DUNG PHẢN HỒI ĐỂ BIẾT LỖI LÀ GÌ
-        print(f"DEBUG STATUS: {response.status_code}")
-        print(f"DEBUG TEXT: {response.text}") 
-
         response.raise_for_status()
     except Exception as e:
-        # In lỗi chi tiết ra terminal
-        print(f"LỖI UPLOAD: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi upload ảnh: {e}")
 
     result = response.json()
