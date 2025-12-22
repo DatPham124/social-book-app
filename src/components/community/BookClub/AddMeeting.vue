@@ -9,6 +9,7 @@ import { USER_SERVICE_URL } from "../../../config";
 const props = defineProps<{ clubId: number }>();
 const emit = defineEmits(["created", "cancel"]);
 
+const agenda = ref("");
 const title = ref("");
 const date = ref("");
 const time = ref("");
@@ -36,20 +37,27 @@ function handleSelectBook(book: Book) {
 }
 
 // 3. SỬA HÀM NÀY
+// Thay thế hàm createMeeting cũ bằng hàm này:
+
 async function createMeeting() {
-  // Lấy user_id
   const userId = userInfo.value?.id || userInfo.value?.user_id;
 
   if (!title.value || !date.value || !time.value) {
-    // Sửa lại alert cho đúng (sách là không bắt buộc)
     alert("Vui lòng điền tên, ngày và giờ họp!");
     return;
   }
 
-  // Thêm kiểm tra user_id
   if (!userId) {
     alert("Lỗi: Không thể xác thực người dùng. Vui lòng đăng nhập lại.");
     return;
+  }
+
+  // Logic kiểm tra thời gian (Giữ nguyên từ câu trả lời trước)
+  const selectedDateTime = new Date(`${date.value}T${time.value}`);
+  const now = new Date();
+  if (selectedDateTime < now) {
+      alert("⚠️ Lỗi: Thời gian họp không hợp lệ!\nBạn không thể tạo cuộc họp trong quá khứ.");
+      return; 
   }
 
   try {
@@ -57,7 +65,10 @@ async function createMeeting() {
     const formData = new FormData();
     formData.append("title", title.value);
     formData.append("date", datetimeLocal);
-    formData.append("user_id", String(userId)); // <-- THÊM USER_ID VÀO FORM
+    formData.append("user_id", String(userId));
+    
+    // 2. Gửi Agenda lên Server
+    formData.append("agenda", agenda.value); 
 
     if (selectedBook.value) {
       formData.append("book_id", String(selectedBook.value.id));
@@ -71,11 +82,10 @@ async function createMeeting() {
         notifyClubMembers(title.value, res.data.id);
     }
 
-    alert("Tạo cuộc họp thành công!");
+    alert("✅ Tạo cuộc họp thành công!");
     emit("created");
   } catch (error: any) {
     console.error("Lỗi khi tạo cuộc họp:", error);
-    // Hiển thị lỗi chính xác từ backend
     alert(error.response?.data?.detail || "Tạo cuộc họp thất bại, vui lòng thử lại!");
   }
 }
@@ -134,6 +144,15 @@ async function notifyClubMembers(meetingTitle: string, meetingId: number) {
         </div>
       </div>
 
+      <div>
+        <label class="block text-sm font-medium text-gray-600 mb-1">Nội dung / Chương trình họp</label>
+        <textarea 
+          v-model="agenda" 
+          rows="4" 
+          class="w-full border rounded-md px-3 py-2 focus:ring-2 focus:ring-yellow-400 focus:outline-none"
+          placeholder="Nhập nội dung chi tiết hoặc ghi chú cho cuộc họp..."
+        ></textarea>
+      </div>
       <div>
         <label class="block text-sm font-medium text-gray-600 mb-1">Chọn sách (Không bắt buộc)</label>
         <input v-model="query" @input="searchBooks" type="text" class="w-full border rounded-md px-3 py-2"

@@ -65,6 +65,37 @@ function formatCommentTime(dateStr: string) {
     });
 }
 
+async function kickMember(targetUserId: number, targetUsername: string) {
+  const currentUserId = userInfo.value?.id || userInfo.value?.user_id;
+  
+  if (!currentUserId) {
+    alert("Lỗi xác thực người dùng.");
+    return;
+  }
+
+  if (!confirm(`Bạn có chắc muốn mời "${targetUsername}" ra khỏi phòng đọc?`)) return;
+
+  try {
+    const formData = new FormData();
+    formData.append("requester_id", String(currentUserId));
+
+    // Gọi API Backend vừa tạo
+    await axios.delete(`${BOOK_SERVICE_URL}buddyreads/${buddyReadId}/members/${targetUserId}`, {
+      data: formData, 
+      headers: { "Content-Type": "multipart/form-data" }
+    });
+
+    alert("Đã xóa thành viên thành công.");
+
+    // Cập nhật lại danh sách thành viên ngay lập tức
+    members.value = members.value.filter(m => m.user_id !== targetUserId);
+
+  } catch (err: any) {
+    console.error(err);
+    alert(err.response?.data?.detail || "Lỗi khi xóa thành viên.");
+  }
+}
+
 async function loadBuddyRead() {
   try {
     const res = await axios.get(`${BOOK_SERVICE_URL}buddyreads/${buddyReadId}`);
@@ -237,6 +268,48 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+      
+      <div class="mt-6">
+  <h3 class="text-lg font-semibold text-gray-700 mb-3">Thành viên tham gia ({{ members.length }})</h3>
+  
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    
+    <div v-for="member in members" :key="member.user_id" 
+         class="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow">
+      
+      <router-link 
+        :to="'/profile/' + member.user_id" 
+        class="flex items-center gap-3 flex-1 group"
+      >
+        <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center font-bold text-gray-700 overflow-hidden shadow-sm flex-shrink-0 group-hover:ring-2 group-hover:ring-yellow-400 transition-all">
+          <img v-if="member.avatar_url" :src="`${AVATAR_SERVER_URL}/${member.avatar_url}`" class="w-full h-full object-cover" />
+          <span v-else class="text-xs">{{ member.username?.charAt(0)?.toUpperCase() }}</span>
+        </div>
+        
+        <div>
+          <p class="font-medium text-gray-800 text-sm group-hover:text-yellow-600 transition-colors">
+            {{ member.username }}
+          </p>
+          <p v-if="buddyRead?.created_by_user_id === member.user_id" class="text-xs text-yellow-600 font-bold">
+            Chủ phòng
+          </p>
+        </div>
+      </router-link>
+
+      <button 
+        v-if="isCreatorOfBuddyRead && buddyRead?.created_by_user_id !== member.user_id"
+        @click.prevent="kickMember(member.user_id, member.username)"
+        class="ml-2 text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-colors"
+        title="Mời ra khỏi phòng"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+        </svg>
+      </button>
+
+    </div>
+  </div>
+</div>
 
       <div class="mt-8">
         <h3 class="text-lg font-semibold text-gray-700 mb-4">Thảo luận ({{ comments.length }})</h3>

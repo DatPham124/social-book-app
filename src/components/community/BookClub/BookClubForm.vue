@@ -130,8 +130,9 @@ async function deleteClub() {
 
   isDeleting.value = true;
   message.value = "";
-  const token = localStorage.getItem("token");
 
+  // 1. Lấy thông tin User từ Token (An toàn hơn dùng userInfo)
+  const token = localStorage.getItem("token");
   const decoded = loadUserFromToken();
   const userId = decoded?.id || decoded?.user_id;
 
@@ -141,20 +142,23 @@ async function deleteClub() {
     return;
   }
 
-  const formData = new FormData();
-  formData.append("user_id", String(userId));
-
+  // 2. Gọi API Xóa (Sử dụng params thay vì FormData)
   try {
     await axios.delete(`${BOOK_SERVICE_URL}bookclubs/${props.clubId}`, {
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${token}`, // Thêm header xác thực cho chắc chắn
       },
-      data: formData 
+      params: { 
+        user_id: userId // Truyền user_id dưới dạng Query Param
+      } 
     });
 
     message.value = "Đã xóa câu lạc bộ thành công!";
-    router.push("/community");
+    // Chuyển hướng về trang danh sách sau khi xóa
+    router.push("/community"); 
+
   } catch (err: any) {
+    console.error("Lỗi xóa CLB:", err);
     message.value = err.response?.data?.detail || "Đã xảy ra lỗi khi xóa!";
   } finally {
     isDeleting.value = false;
