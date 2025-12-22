@@ -54,7 +54,8 @@ export function useBooks() {
       const res = await axios.get(`${BOOK_SERVICE_URL}books/reading-progress/${userId}/${bookId}`);
       return res.data;
     } catch (error) {
-      console.error("Lỗi khi lấy tiến độ:", error);
+      // Không log lỗi quá to vì trường hợp chưa đọc bao giờ thì API có thể trả về null hoặc lỗi nhẹ
+      // console.error("Lỗi khi lấy tiến độ:", error);
       return null;
     }
   }
@@ -79,34 +80,36 @@ export function useBooks() {
   }
 
   async function getAverage(book_id: number) {
-  try {
-    const response = await axios.get(`${REVIEW_SERVICE_URL}review/${book_id}/average-rating`)
-     return response.data; 
+    try {
+      const response = await axios.get(`${REVIEW_SERVICE_URL}review/${book_id}/average-rating`)
+       return response.data; 
+    }
+    catch(error) {
+      console.log("Lỗi khi lấy trung bình đánh giá: ", error);
+      return null;
+    }
   }
-  catch(error) {
-    console.log("Lỗi khi lấy trung bình đánh giá: ", error);
-    return null;
+
+  async function getReviewCount(book_id: number) {
+    try {
+      const response = await axios.get(`${REVIEW_SERVICE_URL}review/${book_id}/review-count`);
+      return response.data;
+    } catch (error) {
+      console.error("Lỗi khi lấy số lượng đánh giá:", error);
+      return null;
+    }
   }
-}
 
-async function getReviewCount(book_id: number) {
-  try {
-    const response = await axios.get(`${REVIEW_SERVICE_URL}review/${book_id}/review-count`);
-    return response.data;
-  } catch (error) {
-    console.error("Lỗi khi lấy số lượng đánh giá:", error);
-    return null;
-  }
-}
-
-
+  // --- HÀM CHÍNH ĐÃ ĐƯỢC CẬP NHẬT ---
   async function fetchBook(bookId: number, userId?: number) {
     try {
+      // 1. Lấy chi tiết sách
       const bookRes = await axios.get(`${BOOK_SERVICE_URL}books/${bookId}/details`);
       const bookData = bookRes.data;
       
       if (!bookData) return null;
 
+      // 2. Lấy thông tin phụ (Author, Category, Rating...)
       const author = bookData.authorID ? await getAuthor(bookData.authorID) : null;
 
       const categoryLinks = await getBookCategories(bookData.id);
@@ -116,6 +119,7 @@ async function getReviewCount(book_id: number) {
         if (category?.name) categoryNames.push(category.name);
       }
 
+      // 3. Lấy Tiến độ & Trạng thái (Quan trọng)
       const progress = userId ? await getReadingProgress(userId, bookData.id) : null;
       const userStatus = userId ? await getUserBookStatus(userId, bookData.id) : null;
       
@@ -125,25 +129,37 @@ async function getReviewCount(book_id: number) {
       const reviewCountData = await getReviewCount(bookData.id);
       const review_count = reviewCountData?.review_count || 0;
 
+      // 4. Tính toán
       const current_page = progress?.current_page || 0;
       const total_pages = bookData.page_count || 0;
       const progress_percentage =
         total_pages > 0 ? Math.round((current_page / total_pages) * 100) : 0;
+      
+      // Lấy CFI để đọc Ebook tiếp tục
+      const current_cfi = progress?.current_cfi || null;
 
+      // 5. Trả về Object đã gộp
       return {
         ...bookData,
         author: author?.name || "Không xác định",
         categories: categoryNames,
+        
+        // Thông tin tiến độ
         current_page,
         total_pages,
         progress_percentage,
-        newPage: current_page,
+        current_cfi, // <--- BỔ SUNG CÁI NÀY QUAN TRỌNG
+        
+        // Thông tin trạng thái
         status: userStatus?.status || "to_read",
         start_date: userStatus?.start_date || null,
         finish_date: userStatus?.finish_date || null,
+        is_favorite: userStatus?.is_favorite || false,        
+        
+        // Thông tin đánh giá
         rating: rating,
         review_count: review_count,
-        is_favorite: userStatus?.is_favorite || false,        
+        
         audios: bookData.audios || [] 
       };
     } catch (error) {
@@ -165,30 +181,40 @@ async function getReviewCount(book_id: number) {
     }
   }
   
-  // Hàm mới cho nút Yêu thích
   async function toggleFavoriteStatus(userId: number, bookId: number, currentState: boolean) {
     try {
       const res = await axios.put(`${BOOK_SERVICE_URL}books/favorite/update/${bookId}/${userId}`);
-      return res.data.is_favorite; // Trả về trạng thái mới từ API
+      return res.data.is_favorite; 
     } catch (error) {
       console.error("Lỗi khi cập nhật yêu thích:", error);
-      return currentState; // Trả về trạng thái cũ nếu lỗi
+      return currentState; 
     }
   }
 
-  // HÀM MỚI ĐỂ CẬP NHẬT NGÀY
   async function updateReadingDates(userId: number, bookId: number, startDate: string | null, finishDate: string | null) {
     try {
       const payload = {
         start_date: startDate,
         finish_date: finishDate
       };
-      // Gọi API PUT mới mà chúng ta đã thêm vào books.py
       const res = await axios.put(`${BOOK_SERVICE_URL}books/status/dates/${userId}/${bookId}`, payload);
-      return res.data; // Trả về bản ghi status đã cập nhật
+      return res.data; 
     } catch (error) {
       console.error("Lỗi khi cập nhật ngày đọc:", error);
-      throw error; // Ném lỗi để component cha xử lý
+      throw error; 
+    }
+  }
+
+  async function updateReadingProgress(userId: number, bookId: number, currentPage: number) {
+    try {
+      const payload = {
+        current_page: currentPage
+      };
+      const res = await axios.put(`${BOOK_SERVICE_URL}books/reading-progress/${userId}/${bookId}`, payload);
+      return res.data;
+    } catch (error) {
+      console.error("Lỗi khi cập nhật tiến độ trang:", error);
+      throw error;
     }
   }
 
@@ -204,8 +230,9 @@ async function getReviewCount(book_id: number) {
     formatDate,
     getAverage,
     getReviewCount,
-    toggleFavoriteStatus, // <-- Thêm hàm
-    updateReadingDates,   // <-- Thêm hàm mới
+    toggleFavoriteStatus, 
+    updateReadingDates,
+    updateReadingProgress,
     errorMessage,
   };
 }

@@ -66,7 +66,7 @@ onMounted(loadChallenge);
   <Navbar />
   <div class="w-full max-w-4xl mx-auto m-5 px-4">
     
-    <h1 class="text-3xl font-bold text-gray-800 mb-6">
+    <h1 class="text-2xl font-logo text-yellow-400 item-center">
       Thử thách Đọc sách {{ currentYear }}
     </h1>
 

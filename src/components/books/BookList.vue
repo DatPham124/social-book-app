@@ -104,80 +104,86 @@ onMounted(fetchBooks);
 
 <template>
   <div class="max-w-3xl mx-auto p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl font-logo text-yellow-400">{{ props.title }}</h1>
+    <div class="flex justify-between items-end mb-6">
+      <p class="text-gray-500 text-sm font-medium">{{ books.length }} quyển sách</p>
+      </div>
 
-      <router-link v-if="props.status === 'currently_reading'" to="/reading-journal"
-        class="px-4 py-1 rounded-md border bg-white hover:bg-yellow-200 text-sm">
-        Xem nhật ký
-      </router-link>
+    <div v-if="loading" class="text-center py-12">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-500 mx-auto mb-2"></div>
+      <span class="text-gray-500">Đang tải sách...</span>
     </div>
 
-    <p class="text-gray-500 text-sm mb-6">{{ books.length }} sách</p>
-
-    <div v-if="loading" class="text-center py-8 text-gray-500">Đang tải sách...</div>
     <div v-else-if="errorMessages" class="text-center py-8 text-red-500">{{ errorMessages }}</div>
 
-    <div v-else-if="books.length === 0" class="text-center py-8 text-gray-500">
-      Không có sách nào
-      <router-link to="/explore" class="text-yellow-500 hover:text-yellow-600 ml-1">
+    <div v-else-if="books.length === 0" class="text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+      <p class="text-gray-500 mb-2">Chưa có sách nào trong danh sách này</p>
+      <router-link to="/explore" class="text-yellow-600 font-medium hover:underline hover:text-yellow-700">
         Khám phá sách mới →
       </router-link>
     </div>
 
-    <div v-else>
-      <div v-for="(book, index) in books" :key="book.id" class="flex border rounded-xl shadow-sm mb-6 bg-white">
-        <div class="w-32 h-52 flex-shrink-0">
-          <router-link :to="{ name: 'book', params: { id: book.id } }" class="w-32 h-52 flex-shrink-0 block">
-            <img :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" :alt="book.title"
-              class="w-full h-full object-cover rounded-l-xl cursor-pointer" />
+    <div v-else class="space-y-6">
+      <div v-for="(book, index) in books" :key="book.id" 
+           class="flex flex-col sm:flex-row bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+        
+        <div class="w-full sm:w-32 h-48 sm:h-auto flex-shrink-0 relative bg-gray-100">
+          <router-link :to="{ name: 'book', params: { id: book.id } }" class="block w-full h-full">
+            <img 
+              :src="`${COVER_IMAGE_SERVER_URL}/${book.cover_url}`" 
+              :alt="book.title"
+              class="w-full h-full object-cover" 
+            />
           </router-link>
         </div>
 
-        <div class="flex flex-grow p-4">
-          <div class="flex-grow pr-6 border-r border-gray-100 min-w-0">
-            <router-link
-            :to="{ name: 'book', params: { id: book.id } }"
-            class="font-bold text-lg mb-0.5 text-gray-800 hover:text-yellow-600 transition"
-            >
-            {{ book.title }}
-            </router-link>
-            <p class="text-gray-600 text-sm mb-1">{{ book.author }}</p>
-            <p class="text-gray-500 text-xs mb-3">
-              {{ book.page_count }} trang • {{ book.language }} •
-              {{ new Date(book.published_date).getFullYear() }}
-            </p>
-
-            <div class="flex flex-wrap gap-2 mb-4">
-              <span v-for="category in book.categories" :key="category"
-                class="px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-                {{ category }}
-              </span>
+        <div class="flex flex-col flex-grow p-4 sm:p-5">
+          
+          <div class="flex justify-between items-start gap-4 mb-2">
+            <div>
+              <router-link
+                :to="{ name: 'book', params: { id: book.id } }"
+                class="font-bold text-lg text-gray-800 hover:text-yellow-600 line-clamp-2 leading-tight"
+              >
+                {{ book.title }}
+              </router-link>
+              <p class="text-gray-600 text-sm mt-1">{{ book.author }}</p>
             </div>
 
-            <p class="text-xs text-gray-500 mt-auto">
-              Bắt đầu đọc: {{ formatDate(book.start_date) }}
-            </p>
-          </div>
-
-          <div class="w-56 pl-6 flex flex-col justify-between items-start flex-shrink-0">
-            <BookProgress v-if="props.status === 'currently_reading'" :book="book" :userId="userInfo.user_id"
-              @update="(updatedBook) => (books[index] = updatedBook)" />
-
-            <BookStatusSelect v-model="book.status" :bookId="book.id" :userId="userInfo.user_id" class="mt-3" />
-
-            <div class="flex flex-col gap-2 w-full mt-auto">
-              <button @click="updateBookStatus(book.id, { value: 'read' })"
-                class="text-sm text-yellow-600 hover:text-yellow-700 font-medium text-left"
-                v-if="props.status === 'currently_reading'">
-                → Đánh dấu "Đã đọc"
-              </button>
-              <button @click="updateBookStatus(book.id, { value: 'dnf' })"
-                class="text-sm text-gray-500 hover:text-gray-700 text-left" v-if="props.status === 'currently_reading'">
-                → Đánh dấu "Chưa hoàn thành"
-              </button>
+            <div class="flex-shrink-0">
+               <BookStatusSelect 
+                  v-model="book.status" 
+                  :bookId="book.id" 
+                  :userId="userInfo.user_id"
+                  class="min-w-[140px]" 
+               />
             </div>
           </div>
+
+          <p class="text-gray-500 text-xs mb-3">
+            {{ book.page_count }} trang • {{ book.language }} • {{ new Date(book.published_date).getFullYear() }}
+          </p>
+
+          <div class="flex flex-wrap gap-2 mb-4">
+            <span v-for="category in book.categories" :key="category"
+              class="px-2.5 py-0.5 bg-yellow-50 text-yellow-700 border border-yellow-100 rounded-full text-xs font-medium">
+              {{ category }}
+            </span>
+          </div>
+
+          <div class="mt-auto pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p class="text-xs text-gray-400">
+              <span v-if="book.start_date">Bắt đầu: {{ formatDate(book.start_date) }}</span>
+            </p>
+
+            <div v-if="props.status === 'currently_reading'" class="w-full sm:w-1/2">
+               <BookProgress 
+                  :book="book" 
+                  :userId="userInfo.user_id"
+                  @update="(updatedBook) => (books[index] = updatedBook)" 
+               />
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

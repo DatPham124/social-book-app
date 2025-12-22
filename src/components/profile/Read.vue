@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import axios from "axios";
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue"; // <-- Thêm watch
 import { jwtDecode } from "jwt-decode";
 import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from "../../config.ts";
+
+// 1. Nhận props userID từ cha
+const props = defineProps<{
+    userID?: number | string;
+}>();
 
 const books = ref<any[]>([]);
 const loading = ref(true);
@@ -44,15 +49,20 @@ async function get_book_by_id(book_id: number) {
 
 // API: lấy sách đã đọc (status = read)
 async function getRecentlyReadBooks() {
-  if (!userInfo) {
-    errorMessage.value = "Bạn chưa đăng nhập!";
+  loading.value = true;
+
+  // 2. Logic: Ưu tiên lấy userID từ props, nếu không có thì lấy của chính mình (userInfo)
+  const targetID = props.userID ? Number(props.userID) : userInfo?.user_id;
+
+  if (!targetID) {
+    errorMessage.value = "Chưa xác định được người dùng!";
     loading.value = false;
     return;
   }
 
   try {
     const response = await axios.get(
-      `${BOOK_SERVICE_URL}books/status/book/${userInfo.user_id}`,
+      `${BOOK_SERVICE_URL}books/status/book/${targetID}`, // <-- Dùng targetID
       { params: { status: "read" } }
     );
 
@@ -66,16 +76,24 @@ async function getRecentlyReadBooks() {
     );
 
     books.value = detailedBooks.filter((b) => b.book !== null);
+    
+    // Reset lỗi nếu có dữ liệu
     if (books.value.length === 0) {
-      errorMessage.value = "Bạn chưa có sách nào trong mục Đã đọc";
+      errorMessage.value = "Chưa có sách nào trong mục Đã đọc";
+    } else {
+      errorMessage.value = null;
     }
+
   } catch (error: any) {
-    loading.value = false
+    loading.value = false;
+    // Reset sách khi lỗi
+    books.value = [];
+
     if (axios.isAxiosError(error) && error.response) {
       if (error.response.status === 404) {
-        errorMessage.value = "Bạn chưa có sách nào trong mục Đã đọc";
+        errorMessage.value = "Chưa có sách nào trong mục Đã đọc";
       } else if (error.response.status === 400) {
-        errorMessage.value = "Yêu cầu không hợp lệ. Vui lòng thử lại.";
+        errorMessage.value = "Yêu cầu không hợp lệ.";
       } else {
         errorMessage.value = "Đã xảy ra lỗi. Vui lòng thử lại sau.";
       }
@@ -90,6 +108,11 @@ async function getRecentlyReadBooks() {
 onMounted(() => {
   getRecentlyReadBooks();
 });
+
+// 3. Watch: Khi userID thay đổi (chuyển profile), load lại dữ liệu
+watch(() => props.userID, () => {
+  getRecentlyReadBooks();
+});
 </script>
 
 <template>
@@ -101,7 +124,7 @@ onMounted(() => {
 
     <!-- Phần nội dung căn giữa -->
     <div class="flex-1 flex flex-col justify-center">
-      <div v-if="loading" class="text-center">Đang tải...</div>
+      <div v-if="loading" class="text-center text-gray-500 italic">Đang tải...</div>
       <div v-else-if="errorMessage" class="text-gray-500 italic text-center">
         {{ errorMessage }}
       </div>
@@ -119,11 +142,9 @@ onMounted(() => {
         </div>
 
         <div class="mt-4 flex space-x-3 justify-center">
+          <!-- Lưu ý: Bạn có thể cần cập nhật router-link này để truyền thêm params id nếu muốn xem tất cả sách của user đó -->
           <router-link to="/profile/view/read" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
             Xem tất cả
-          </router-link>
-          <router-link to="/" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
-            Xem nhật ký
           </router-link>
         </div>
       </div>

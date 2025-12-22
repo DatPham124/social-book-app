@@ -5,12 +5,13 @@ import Read from "../components/profile/Read.vue";
 import ToReadPile from "../components/profile/ToReadPile.vue";
 import DidNotFinish from "../components/profile/DidNotFinish.vue";
 import ProfileHeader from "../components/profile/ProfileHeader.vue";
-import ProfileReviews from "../components/profile/ProfileReviews.vue"; // <-- 1. IMPORT LẠI
+import ProfileReviews from "../components/profile/ProfileReviews.vue"; 
 import { useRoute } from "vue-router"
+import { computed } from 'vue'
 
 const route = useRoute()
-const userID = route.params.id;
-
+// Lấy ID từ URL (ví dụ /profile/5 -> userID = 5)
+const userID = computed(() => route.params.id);
 </script>
 
 <template>
@@ -23,10 +24,10 @@ const userID = route.params.id;
             
             <div class="space-y-8">
                 <div>
-                    <CurentlyReadingBooks />
+                    <CurentlyReadingBooks :userID="userID" />
                 </div>
                 <div>
-                    <Read />
+                    <Read :userID="userID" />
                 </div>
             </div>
             
@@ -34,10 +35,10 @@ const userID = route.params.id;
                 
                 <ProfileReviews :userID="userID" />
                 
-                <DidNotFinish />
+                <DidNotFinish :userID="userID" />
 
                 <div>
-                    <ToReadPile />
+                    <ToReadPile :userID="userID" />
                 </div>
 
             </div>

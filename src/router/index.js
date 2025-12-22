@@ -43,6 +43,8 @@ import ImmersiveRead from "../views/ImmersiveRead.vue";
 
 import ReadEbook from "../views/ReadEbook.vue"
 
+import FriendPage from "../views/FriendPage.vue";
+
 const routes = [
   { path: "/login", name: "Login", component: Login },
   { path: "/home", name: "Home", component: Home },
@@ -177,6 +179,13 @@ const routes = [
     path: "/book/:id/immersive",
     name: "ImmersiveRead",
     component: ImmersiveRead,
+    meta: { requiresAuth: true },
+  },
+
+  {
+    path: "/friends",
+    name: "FriendPage",
+    component: FriendPage,
     meta: { requiresAuth: true },
   },
 

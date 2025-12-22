@@ -26,7 +26,6 @@ const sounds = [
   { id: 'rain', name: 'Mưa rơi 🌧️', file: '/sounds/rain.mp3', color: 'from-gray-800 to-blue-900' },
   { id: 'cafe', name: 'White Noise ⚪', file: '/sounds/whitenoise.mp3', color: 'from-gray-500 to-slate-700' },
   { id: 'fireplace', name: 'Brown Noise 🟤', file: '/sounds/brownnoise.mp3', color: 'from-stone-800 to-stone-900' },
-  { id: 'lofi', name: 'Nhạc Lofi 🎧', file: '/sounds/lofi.mp3', color: 'from-purple-900 to-indigo-900' },
   { id: 'off', name: 'Yên lặng 🔇', file: '', color: 'from-gray-900 to-black' }
 ];
 

@@ -176,6 +176,7 @@ onMounted(async () => {
       return;
     }
 
+    // fetchBook giờ đã trả về đầy đủ current_page, current_cfi, progress_percentage
     const data = await fetchBook(bookId, userInfo.value?.user_id);
     if (!data) {
       error.value = "Không tìm thấy dữ liệu sách.";
@@ -185,8 +186,11 @@ onMounted(async () => {
 
     book.value = data;
     currentStatus.value = mapStatus(data.status || "to_read");
+    
+    // Tắt loading
     loading.value = false;
 
+    // Load các phần phụ
     loadFriendActivity();
     loadAiSummary();
 
@@ -196,6 +200,8 @@ onMounted(async () => {
     loading.value = false;
   }
 });
+
+
 
 function formatYear(dateString: string) {
   if (!dateString) return "—";
@@ -273,9 +279,13 @@ async function saveDates() {
 function handleProgressAutoUpdate(newPages: number) {
   if (book.value) {
     book.value.current_page = newPages;
-    book.value.progress_percentage = 100;
+    if (book.value.page_count > 0) {
+        const percent = (newPages / book.value.page_count) * 100;
+        book.value.progress_percentage = percent > 100 ? 100 : percent;
+    }
   }
 }
+
 </script>
 
 <style>
@@ -521,18 +531,7 @@ function handleProgressAutoUpdate(newPages: number) {
             class="block w-full py-2 mt-2 rounded border text-sm text-center font-bold transition-colors duration-200 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100">
             📖 Vào Phòng Đọc (Focus Mode)
           </router-link>
-
-          <button class="w-full py-1.5 rounded border text-sm text-gray-700 hover:bg-gray-50">
-            📚 Đánh dấu là đã sở hữu
-          </button>
         </div>
-
-        <div class="text-sm text-gray-700 space-y-2">
-          <a href="#" class="block text-yellow-600 hover:text-yellow-700">Khám phá các sách tương tự...</a>
-          <a href="#" class="block text-yellow-600 hover:text-yellow-700">Bắt đầu đọc cùng bạn bè...</a>
-          <a href="#" class="block text-yellow-600 hover:text-yellow-700">Tạo thử thách đọc mới...</a>
-        </div>
-
         <div class="border-t border-gray-200 pt-4 text-sm text-gray-600">
           <p><strong>Ngày phát hành:</strong> {{ formatDate(book.published_date) }}</p>
           <p><strong>Tổng số trang:</strong> {{ book.page_count }}</p>

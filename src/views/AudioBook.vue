@@ -4,7 +4,6 @@ import Navbar from '../components/layout/Navbar.vue';
 import ReadingPlayer from '../components/community/Reading/ReadingPlayer.vue';
 import GroupChatPanel from '../components/community/Reading/GroupChatPanel.vue';
 import { useAuth } from '../composables/useAuth';
-import { useBooks } from '../composables/useBook';
 import { BOOK_SERVICE_URL, USER_SERVICE_URL } from '../config';
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import axios from 'axios';
@@ -42,17 +41,14 @@ const isHost = computed(() => {
     return String(userInfo.value.user_id) === String(hostId.value);
 });
 
-// --- LOGIC REACTION ĐÃ SỬA ---
+// --- LOGIC REACTION ---
 
 function handleReaction(emoji: string) {
     if (props.mode === 'group' && userInfo.value) {
-        // Chỉ gửi lên server, KHÔNG tự spawn icon cục bộ nữa
-        // Để tránh hiện tượng hiện 2 lần (1 lần local, 1 lần do server báo về)
         sendReaction(roomId.value, emoji, userInfo.value.user_id);
     }
 }
 
-// Khi server báo về (bao gồm cả reaction của chính mình), mới cho hiện icon
 watch(incomingReaction, (val) => {
     if (val) {
         spawnEmoji(val.type);
@@ -132,16 +128,29 @@ onBeforeRouteLeave((to, from, next) => {
   }
 });
 
+// --- SỬA LỖI Ở ĐÂY ---
 async function confirmExit(save: boolean) {
     if (save && currentBook.value && userInfo.value) {
         try {
-            await axios.put(`${BOOK_SERVICE_URL}books/reading-progress/${userInfo.value.user_id}/${currentBook.value.id}`, null, { params: { current_page_from_user: currentProgressPage.value } });
-        } catch(e) { console.error("Lỗi lưu:", e); }
+            // FIX: Gửi dữ liệu vào BODY (tham số thứ 2), thay vì params
+            const payload = {
+                current_page: currentProgressPage.value
+            };
+            
+            await axios.put(
+                `${BOOK_SERVICE_URL}books/reading-progress/${userInfo.value.user_id}/${currentBook.value.id}`, 
+                payload 
+            );
+            console.log("✅ Đã lưu tiến độ audio:", currentProgressPage.value);
+        } catch(e) { 
+            console.error("Lỗi lưu:", e); 
+        }
     }
     if (props.mode === 'group') leaveRoom();
     showExitModal.value = false;
     if (pendingNextRoute.value) pendingNextRoute.value();
 }
+// ---------------------
 
 onMounted(async () => {
     if (!userInfo.value) { router.push('/login'); return; }

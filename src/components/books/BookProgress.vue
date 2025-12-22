@@ -14,10 +14,13 @@ const isSaving = ref(false);
 async function updateReadingProgress(newPage: number) {
   isSaving.value = true;
   try {
+    const payload = {
+        current_page: newPage
+    };
+
     await axios.put(
       `${BOOK_SERVICE_URL}books/reading-progress/${props.userId}/${props.book.id}`,
-      null,
-      { params: { current_page_from_user: newPage } }
+      payload
     );
 
     props.book.current_page = newPage;
@@ -25,6 +28,8 @@ async function updateReadingProgress(newPage: number) {
       props.book.total_pages > 0
         ? Math.round((newPage / props.book.total_pages) * 100)
         : 0;
+    
+    props.book.editingProgress = false;
 
     emit("update", props.book);
   } catch (error: any) {
@@ -66,14 +71,15 @@ async function updateReadingProgress(newPage: number) {
         v-model.number="book.newPage"
         min="0"
         :max="book.total_pages"
-        class="w-20 border rounded px-2 py-1 text-sm"
+        class="w-20 border rounded px-2 py-1 text-sm outline-none focus:border-yellow-500"
+        placeholder="Số trang"
       />
       <button
         @click="updateReadingProgress(book.newPage)"
-        class="px-2 py-1 bg-yellow-400 text-white rounded text-sm hover:bg-yellow-500"
+        class="px-2 py-1 bg-yellow-400 text-white rounded text-sm hover:bg-yellow-500 disabled:opacity-50"
         :disabled="isSaving"
       >
-        <span v-if="isSaving">Đang lưu...</span>
+        <span v-if="isSaving">Lưu...</span>
         <span v-else>Lưu</span>
       </button>
     </div>

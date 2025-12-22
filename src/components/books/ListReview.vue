@@ -166,29 +166,17 @@ onMounted(async () => {
                             title="Chỉnh sửa đánh giá">
                             <font-awesome-icon icon="fa-solid fa-circle-arrow-right" class="text-2xl" />
                             </ router-link>
-
-
                     </div>
-
-
-
                     <p class="text-gray-700 text-sm leading-relaxed mb-3 transition-all duration-300"
                         :class="!expanded[index] ? 'line-clamp-3' : ''">
                         {{ review.content || "Người dùng này không để lại bình luận nào." }}
                     </p>
-
-
-
-
                     <!-- Nút xem thêm / ẩn bớt -->
                     <button v-if="review.content?.length > 150"
                         class="text-sm text-yellow-600 hover:text-yellow-700 font-semibold transition-colors"
                         @click="expanded[index] = !expanded[index]">
                         {{ expanded[index] ? 'Ẩn bớt' : 'Xem thêm' }}
                     </button>
-
-
-
                 </div>
             </div>
         </div>

@@ -95,6 +95,7 @@ onMounted(async () => {
                         </router-link>
 
                         <router-link to="/community" class="text-gray-700 hover:text-yellow-500 font-medium">Cộng đồng</router-link>
+                        
                         <router-link to="/friends" class="text-gray-700 hover:text-yellow-500 font-medium">Bạn bè</router-link>
 
                         <!-- Search Bar -->
@@ -163,12 +164,6 @@ onMounted(async () => {
                                 <router-link :to="{ name: 'Notification' }"
                                     :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
                                     Xem tất cả thông báo
-                                </router-link>
-                                </MenuItem>
-                                <MenuItem v-slot="{ active }">
-                                <router-link to="/settings"
-                                    :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
-                                    Cài đặt
                                 </router-link>
                                 </MenuItem>
                                 <MenuItem v-slot="{ active }">
