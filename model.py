@@ -5,6 +5,12 @@ from sqlalchemy import Enum, UniqueConstraint
 from sqlmodel import SQLModel, Field
 
 
+class ProfileUpdate(SQLModel):
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
 class UserPublic(SQLModel):
     id: int
     username: str

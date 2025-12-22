@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from sqlalchemy import select
 from sqlmodel import Session
 from common_lib.database import get_session_user_service
-from ..model import Profile, User
+from ..model import Profile, User, ProfileUpdate
 from .. import auth
 from dotenv import load_dotenv
 import os
@@ -34,14 +34,19 @@ def create_profile(
 
 @router.put("/profile/update")
 def update_profile(
-    profile_data: Profile,
+    profile_data: ProfileUpdate,  # <--- SỬA: Dùng ProfileUpdate thay vì Profile
     session: Session = Depends(get_session_user_service),
     current_user: User = Depends(auth.get_current_active_user)
 ):
+    # 2. Tìm profile trong DB
     profile = session.get(Profile, current_user.id)
-    if profile is None:
-        raise HTTPException(status_code=400, detail="Can't get profile")
     
+    # 3. SỬA LOGIC: Nếu chưa có profile thì TẠO MỚI thay vì báo lỗi
+    if profile is None:
+        profile = Profile(user_id=current_user.id)
+        session.add(profile) # Đánh dấu để lát nữa commit
+    
+    # 4. Cập nhật dữ liệu
     if profile_data.full_name is not None:
         profile.full_name = profile_data.full_name
     if profile_data.bio is not None:
