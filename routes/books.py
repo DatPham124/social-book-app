@@ -1,7 +1,6 @@
 from typing import List, Optional, Any
 from sqlalchemy import extract, func, and_, Text
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
-# 1. IMPORT THÊM 'delete'
 from sqlmodel import Session, select, delete
 from datetime import datetime, date
 from google import genai
@@ -133,7 +132,7 @@ def get_ai_summary(
     )
         
         response = client.models.generate_content(
-            model="gemini-2.5-flash", 
+            model="gemini-2.0-flash-lite", 
             config=generate_content_config,
             contents=[prompt] 
         )
@@ -180,6 +179,8 @@ def get_book_by_id(book_id: int, session: Session = Depends(get_session_book_ser
     
     return book
 
+# === AUDIO ROUTES ===
+
 @router.post("/{book_id}/audio/add")
 def add_audio_chapter(
     book_id: int,
@@ -191,6 +192,22 @@ def add_audio_chapter(
     audio = BookAudio(book_id=book_id, title=title, file_url=file_url, order=order)
     session.add(audio)
     session.commit()
+    return audio
+
+@router.put("/audio/{audio_id}/update-title", response_model=BookAudio)
+def update_audio_chapter_title(
+    audio_id: int,
+    title: str = Body(..., embed=True), # Client gửi JSON: {"title": "Tên mới"}
+    session: Session = Depends(get_session_book_service)
+):
+    audio = session.get(BookAudio, audio_id)
+    if not audio:
+        raise HTTPException(status_code=404, detail="Audio chapter not found")
+
+    audio.title = title
+    session.add(audio)
+    session.commit()
+    session.refresh(audio)
     return audio
 
 # API LẤY CHI TIẾT SÁCH KÈM AUDIO
@@ -484,21 +501,23 @@ def get_reading_progress(
     
     return progress
 
+class ProgressRequest(BaseModel):
+    current_page: Optional[int] = 0
+    current_cfi: Optional[str] = None
+
 @router.put("/reading-progress/{user_id}/{book_id}", response_model=ReadingProgress)
 def update_reading_progress(
     user_id: int,
     book_id: int,
-    current_page_from_user: int,
+    progress_data: ProgressRequest = Body(...), # Nhận JSON Body
     session: Session = Depends(get_session_book_service)
 ):
-    
+    # Tìm sách
     book = session.get(Books, book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
     
-    if book.page_count and current_page_from_user > book.page_count:
-        raise HTTPException(status_code=400, detail="Số trang vượt quá số trang thực tế")
-
+    # Tìm tiến độ cũ
     statement = select(ReadingProgress).where(
         and_(
             ReadingProgress.user_id == user_id,
@@ -511,11 +530,18 @@ def update_reading_progress(
         progress = ReadingProgress(
             user_id=user_id,
             book_id=book_id,
-            current_page=current_page_from_user    
+            current_page=progress_data.current_page,
+            current_cfi=progress_data.current_cfi
         )
     else:
-        progress.current_page = current_page_from_user
-        
+        if progress_data.current_page is not None:
+            progress.current_page = progress_data.current_page
+            
+        if progress_data.current_cfi is not None:
+            progress.current_cfi = progress_data.current_cfi
+            
+        progress.updated_at = date.today()
+
     session.add(progress)
     session.commit()
     session.refresh(progress)

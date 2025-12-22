@@ -349,7 +349,7 @@ def get_book_characters(
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash-lite",
             config=types.GenerateContentConfig(
                 temperature=0.1, # Cần sự chính xác hơn sáng tạo
                 response_mime_type="application/json",
@@ -438,7 +438,7 @@ def chat_with_character(
     # 4. Gọi Gemini
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash-lite",
             config=types.GenerateContentConfig(
                 temperature=0.8, 
                 system_instruction=system_prompt, # Đưa roleplay vào system instruction

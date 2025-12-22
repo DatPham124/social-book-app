@@ -58,6 +58,7 @@ class ReadingProgress(SQLModel, table=True):
     user_id: int = Field(index=True, nullable=False)
     book_id: int = Field(foreign_key="books.id", nullable=False)
     current_page: int = Field(default=0, nullable=False)
+    current_cfi: Optional[str] = Field(default=None, sa_column=Column(Text))
     updated_at: date = Field(default_factory=date.today)
 
     __table_args__ = (
