@@ -1,0 +1,185 @@
+<script lang="ts" setup>
+import { onMounted, ref } from "vue"
+import { useRouter } from "vue-router";
+import { jwtDecode } from "jwt-decode"
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
+import { AVATAR_SERVER_URL, USER_SERVICE_URL } from '../../config'
+import axios from "axios"
+// 1. Import Component Mới
+import NotificationDropdown from './NotificationDropdown.vue'; 
+
+interface TokenPayLoad {
+    username: string
+    roles: number[]
+    exp: number
+    user_id: number
+}
+
+const token = localStorage.getItem("token")
+let userInfo: TokenPayLoad | null = null
+
+if (token) {
+    try {
+        userInfo = jwtDecode<TokenPayLoad>(token);
+        if (userInfo.exp * 1000 < Date.now()) {
+            localStorage.removeItem('token');
+            userInfo = null;
+        }
+    } catch (error) {
+        console.error("Invalid token:", error);
+        localStorage.removeItem('token');
+    }
+}
+
+const signOut = () => {
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+}
+
+
+const router = useRouter();
+const searchQuery = ref("");
+
+function handleSearch() {
+    if (searchQuery.value.trim()) {
+        router.push({
+            name: 'Search',
+            query: { q: searchQuery.value }
+        });
+        searchQuery.value = "";
+    }
+}
+
+const profile = ref<any>(null)
+
+async function get_profile_by_user() {
+    if (!token) return;
+    try {
+        const res = await axios.get(`${USER_SERVICE_URL}users/profile`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        profile.value = res.data;
+    } catch (error: unknown) {
+        console.log("Không thể tải profile");
+    }
+}
+
+
+onMounted(async () => {
+    if (userInfo) {
+        await get_profile_by_user();
+    }
+})
+</script>
+
+<template>
+    <nav class="bg-white shadow-md relative z-50"> <!-- Thêm z-50 để dropdown đè lên -->
+        <div class="mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center mx-10">
+                <div class="flex space-x-8 item-center">
+                    <h1 class="text-2xl font-logo text-yellow-500 item-center cursor-pointer" @click="router.push('/home')">📚 Social Book</h1>
+
+                    <div v-if="userInfo" class="hidden md:flex space-x-6 items-center">
+                        <router-link to="/home" class="text-gray-700 hover:text-yellow-500 font-medium">Trang chủ</router-link>
+
+                        <router-link :to="{ name: 'StatisticsTab', params: { id: userInfo.user_id } }"
+                            class="text-gray-700 hover:text-yellow-500 font-medium">Thống kê
+                        </router-link>
+
+                        <router-link :to="{ name: 'Recommendations' }" class="text-gray-700 hover:text-yellow-500 font-medium">
+                            Gợi ý AI
+                        </router-link>
+
+                        <router-link :to="{ name: 'Challenge' }" class="text-gray-700 hover:text-yellow-500 font-medium">
+                            Thử thách
+                        </router-link>
+
+                        <router-link to="/community" class="text-gray-700 hover:text-yellow-500 font-medium">Cộng đồng</router-link>
+                        
+                        <router-link to="/friends" class="text-gray-700 hover:text-yellow-500 font-medium">Bạn bè</router-link>
+
+                        <!-- Search Bar -->
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 cursor-pointer"
+                                @click="handleSearch">
+                                <font-awesome-icon icon="fa-solid fa-magnifying-glass" />
+                            </span>
+
+                            <input type="text" placeholder="Tìm kiếm..."
+                                class="pl-10 border border-gray-300 rounded-full px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 w-48 transition-all focus:w-64"
+                                v-model="searchQuery" @keydown.enter="handleSearch">
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="userInfo" class="flex items-center gap-4">
+                    
+                    <!-- 2. THÊM NOTIFICATION DROPDOWN VÀO ĐÂY -->
+                    <NotificationDropdown />
+                    <!-- ------------------------------------- -->
+
+                    <Menu as="div" class="relative">
+                        <MenuButton
+                            class="flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
+                            <span class="sr-only">Open user menu</span>
+
+                            <img v-if="profile && profile.avatar_url"
+                                :src="`${AVATAR_SERVER_URL}/${profile.avatar_url}`" alt="avatar"
+                                class="w-9 h-9 rounded-full border border-gray-300 object-cover">
+
+                            <div v-else
+                                class="w-9 h-9 rounded-full border border-gray-300 bg-yellow-400 flex items-center justify-center">
+                                <span class="text-lg font-semibold text-white">
+                                    {{ userInfo.username?.charAt(0).toUpperCase() }}
+                                </span>
+                            </div>
+
+                        </MenuButton>
+
+                        <transition enter-active-class="transition ease-out duration-100"
+                            enter-from-class="transform opacity-0 scale-95"
+                            enter-to-class="transform opacity-100 scale-100"
+                            leave-active-class="transition ease-in duration-75"
+                            leave-from-class="transform opacity-100 scale-100"
+                            leave-to-class="transform opacity-0 scale-95">
+                            <MenuItems
+                                class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                                <div class="px-4 py-2 text-sm text-gray-700 border-b">
+                                    <strong class="font-medium">{{ userInfo.username }}</strong>
+                                </div>
+                                <MenuItem v-slot="{ active }">
+                                <router-link :to="{ name: 'profile', params: { id: userInfo.user_id } }"
+                                    :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
+                                    Hồ sơ của bạn
+                                </router-link>
+                                </MenuItem>
+                                <MenuItem v-slot="{ active }">
+                                <router-link :to="{ name: 'Challenge' }"
+                                    :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
+                                    Thử thách đọc sách
+                                </router-link>
+                                </MenuItem>
+                                <!-- Đã có Dropdown nên có thể bỏ dòng này hoặc giữ làm trang chi tiết -->
+                                <MenuItem v-slot="{ active }">
+                                <router-link :to="{ name: 'Notification' }"
+                                    :class="[active ? 'bg-yellow-100' : '', 'block px-4 py-2 text-sm text-gray-700']">
+                                    Xem tất cả thông báo
+                                </router-link>
+                                </MenuItem>
+                                <MenuItem v-slot="{ active }">
+                                <button @click="signOut"
+                                    :class="[active ? 'bg-yellow-100' : '', 'block w-full text-left px-4 py-2 text-sm text-gray-700']">
+                                    Đăng xuất
+                                </button>
+                                </MenuItem>
+                            </MenuItems>
+                        </transition>
+                    </Menu>
+                </div>
+                <div v-else>
+                    <router-link to="/login" class="text-gray-700 hover:text-yellow-500 font-medium">Đăng nhập</router-link>
+                </div>
+            </div>
+        </div>
+    </nav>
+</template>

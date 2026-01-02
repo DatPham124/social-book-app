@@ -1,0 +1,153 @@
+<script setup lang="ts">
+import axios from "axios";
+import { ref, onMounted, watch } from "vue"; // <-- Thêm watch
+import { jwtDecode } from "jwt-decode";
+import { BOOK_SERVICE_URL, COVER_IMAGE_SERVER_URL } from "../../config.ts";
+
+// 1. Nhận props userID từ cha
+const props = defineProps<{
+    userID?: number | string;
+}>();
+
+const books = ref<any[]>([]);
+const loading = ref(true);
+const errorMessage = ref<string | null>(null);
+
+interface TokenPayLoad {
+  username: string;
+  roles: number[];
+  exp: number;
+  user_id: number;
+}
+
+const token = localStorage.getItem("token");
+let userInfo: TokenPayLoad | null = null;
+
+if (token) {
+  try {
+    userInfo = jwtDecode<TokenPayLoad>(token);
+    if (userInfo.exp * 1000 < Date.now()) {
+      localStorage.removeItem("token");
+      userInfo = null;
+    }
+  } catch (error) {
+    console.error("Invalid token:", error);
+    localStorage.removeItem("token");
+  }
+}
+
+// API: lấy chi tiết 1 cuốn sách
+async function get_book_by_id(book_id: number) {
+  try {
+    const response = await axios.get(`${BOOK_SERVICE_URL}books/${book_id}`);
+    return response.data;
+  } catch (error: any) {
+    console.error("Error fetching book detail", error);
+    return null;
+  }
+}
+
+// API: lấy sách đã đọc (status = read)
+async function getRecentlyReadBooks() {
+  loading.value = true;
+
+  // 2. Logic: Ưu tiên lấy userID từ props, nếu không có thì lấy của chính mình (userInfo)
+  const targetID = props.userID ? Number(props.userID) : userInfo?.user_id;
+
+  if (!targetID) {
+    errorMessage.value = "Chưa xác định được người dùng!";
+    loading.value = false;
+    return;
+  }
+
+  try {
+    const response = await axios.get(
+      `${BOOK_SERVICE_URL}books/status/book/${targetID}`, // <-- Dùng targetID
+      { params: { status: "read" } }
+    );
+
+    const statusList = response.data;
+
+    const detailedBooks = await Promise.all(
+      statusList.map(async (item: any) => {
+        const book = await get_book_by_id(item.book_id);
+        return { ...item, book };
+      })
+    );
+
+    books.value = detailedBooks.filter((b) => b.book !== null);
+    
+    // Reset lỗi nếu có dữ liệu
+    if (books.value.length === 0) {
+      errorMessage.value = "Chưa có sách nào trong mục Đã đọc";
+    } else {
+      errorMessage.value = null;
+    }
+
+  } catch (error: any) {
+    loading.value = false;
+    // Reset sách khi lỗi
+    books.value = [];
+
+    if (axios.isAxiosError(error) && error.response) {
+      if (error.response.status === 404) {
+        errorMessage.value = "Chưa có sách nào trong mục Đã đọc";
+      } else if (error.response.status === 400) {
+        errorMessage.value = "Yêu cầu không hợp lệ.";
+      } else {
+        errorMessage.value = "Đã xảy ra lỗi. Vui lòng thử lại sau.";
+      }
+    } else {
+      errorMessage.value = "Không thể kết nối đến server.";
+    }
+  } finally {
+    loading.value = false;
+  }
+}
+
+onMounted(() => {
+  getRecentlyReadBooks();
+});
+
+// 3. Watch: Khi userID thay đổi (chuyển profile), load lại dữ liệu
+watch(() => props.userID, () => {
+  getRecentlyReadBooks();
+});
+</script>
+
+<template>
+  <div class="bg-white p-6 rounded-lg shadow border h-[325px] flex flex-col">
+    <!-- Luôn nằm trên cùng -->
+    <h3 class="text-lg font-semibold mb-4">
+      Đã đọc ({{ books.length }})
+    </h3>
+
+    <!-- Phần nội dung căn giữa -->
+    <div class="flex-1 flex flex-col justify-center">
+      <div v-if="loading" class="text-center text-gray-500 italic">Đang tải...</div>
+      <div v-else-if="errorMessage" class="text-gray-500 italic text-center">
+        {{ errorMessage }}
+      </div>
+      <div v-else class="space-y-10">
+        <div class="flex space-x-4 justify-center">
+          <div v-for="item in books.slice(0, 4)" :key="item.book.id"
+            class="w-20 h-28 shadow rounded overflow-hidden bg-gray-100 flex">
+
+            <router-link :to="{ name: 'book', params: { id: item.book.id } }">
+              <img :src="`${COVER_IMAGE_SERVER_URL}/${item.book.cover_url}`" :alt="item.book.title"
+                class="h-full w-full object-cover" />
+            </router-link>
+
+          </div>
+        </div>
+
+        <div class="mt-4 flex space-x-3 justify-center">
+          <!-- Lưu ý: Bạn có thể cần cập nhật router-link này để truyền thêm params id nếu muốn xem tất cả sách của user đó -->
+          <router-link to="/profile/view/read" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">
+            Xem tất cả
+          </router-link>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
