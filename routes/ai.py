@@ -309,7 +309,6 @@ class CharacterListResponse(BaseModel):
     
 # === CHỨC NĂNG CHAT NHÂN VẬT (ĐÃ NÂNG CẤP XỬ LÝ BIÊN) ===
 
-# 1. API LẤY DANH SÁCH (Đã sửa prompt để thông minh hơn)
 @router.get("/characters/{book_id}", response_model=CharacterListResponse)
 def get_book_characters(
     book_id: int,
@@ -351,7 +350,7 @@ def get_book_characters(
         response = client.models.generate_content(
             model="gemini-2.0-flash-lite",
             config=types.GenerateContentConfig(
-                temperature=0.1, # Cần sự chính xác hơn sáng tạo
+                temperature=0.1, 
                 response_mime_type="application/json",
                 safety_settings=[
                     types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
@@ -364,7 +363,6 @@ def get_book_characters(
         )
         
         if not response.text:
-             # Fallback an toàn nếu AI trả rỗng
              return CharacterListResponse(characters=["Tác giả", "Người dẫn chuyện"])
 
         characters = json.loads(response.text)
