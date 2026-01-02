@@ -323,13 +323,11 @@ onMounted(async () => {
 
     // B. BẮT ĐẦU QUÉT SỐ TRANG
     book.value.ready.then(() => {
-        console.log("⏳ Đang tính toán độ dài sách...");
+        console.log("⏳ Đang tính toán độ dài sách...");book
         isCalculating.value = true;
-        // Dùng optional chaining (?.) cho an toàn
         return book.value?.locations.generate(1000); 
     }).then(() => {
         isCalculating.value = false;
-        // Dùng optional chaining (?.)
         totalScanPages.value = book.value?.locations.length() || 0;
         console.log("✅ Tính xong! Tổng trang:", totalScanPages.value);
         

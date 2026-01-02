@@ -90,7 +90,6 @@ async function loadFriendFeed() {
 
     const combinedFeed = [...enrichedStatus, ...enrichedReviews];
     
-    // ✅ SỬA LỖI SẮP XẾP (THÊM + "Z")
     combinedFeed.sort((a, b) => new Date(b.date + "Z").getTime() - new Date(a.date + "Z").getTime());
     
     feedItems.value = combinedFeed as FeedItem[];
@@ -110,7 +109,6 @@ function goToBook(bookId: number) {
   router.push(`/book/${bookId}`);
 }
 
-// ✅ SỬA LỖI HÀM THỜI GIAN (THÊM + "Z")
 function formatTime(dateString: string) {
   const diffMs = Date.now() - new Date(dateString + "Z").getTime();
   const phut = Math.floor(diffMs / 60000);

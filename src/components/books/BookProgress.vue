@@ -12,10 +12,17 @@ const emit = defineEmits(["update"]);
 const isSaving = ref(false);
 
 async function updateReadingProgress(newPage: number) {
+  let validPage = newPage;
+
+  if (validPage < 0) validPage = 0;
+  if (props.book.total_pages > 0 && validPage > props.book.total_pages) {
+      validPage = props.book.total_pages;
+  }
+  
   isSaving.value = true;
   try {
     const payload = {
-        current_page: newPage
+        current_page: validPage 
     };
 
     await axios.put(
@@ -23,10 +30,15 @@ async function updateReadingProgress(newPage: number) {
       payload
     );
 
-    props.book.current_page = newPage;
+    props.book.current_page = validPage;
+    
+    if (props.book.newPage !== undefined) {
+        props.book.newPage = validPage; 
+    }
+
     props.book.progress_percentage =
       props.book.total_pages > 0
-        ? Math.round((newPage / props.book.total_pages) * 100)
+        ? Math.round((validPage / props.book.total_pages) * 100) 
         : 0;
     
     props.book.editingProgress = false;

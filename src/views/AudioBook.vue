@@ -128,7 +128,6 @@ onBeforeRouteLeave((to, from, next) => {
   }
 });
 
-// --- SỬA LỖI Ở ĐÂY ---
 async function confirmExit(save: boolean) {
     if (save && currentBook.value && userInfo.value) {
         try {
@@ -150,7 +149,6 @@ async function confirmExit(save: boolean) {
     showExitModal.value = false;
     if (pendingNextRoute.value) pendingNextRoute.value();
 }
-// ---------------------
 
 onMounted(async () => {
     if (!userInfo.value) { router.push('/login'); return; }
@@ -177,7 +175,6 @@ function goBack() { router.back(); }
         </div>
     </div>
 
-    <!-- LAYER EMOJI -->
     <div class="absolute inset-0 pointer-events-none overflow-hidden z-50">
         <div v-for="emoji in floatingEmojis" :key="emoji.id"
              class="absolute bottom-10 text-4xl animate-float opacity-0 select-none"

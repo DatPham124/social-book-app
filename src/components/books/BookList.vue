@@ -33,6 +33,7 @@ const statuses = [
   { value: "currently_reading", label: "Đang đọc" },
   { value: "read", label: "Đã đọc" },
   { value: "dnf", label: "Chưa hoàn thành" },
+  { value: "rm_book", label: "Xóa sách khỏi kệ" },
 ];
 
 let userInfo: any = null;
@@ -124,7 +125,7 @@ onMounted(fetchBooks);
 
     <div v-else class="space-y-6">
       <div v-for="(book, index) in books" :key="book.id" 
-           class="flex flex-col sm:flex-row bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+           class="flex flex-col sm:flex-row bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200">
         
         <div class="w-full sm:w-32 h-48 sm:h-auto flex-shrink-0 relative bg-gray-100">
           <router-link :to="{ name: 'book', params: { id: book.id } }" class="block w-full h-full">

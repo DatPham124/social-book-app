@@ -3,13 +3,11 @@ import {
     doc, onSnapshot, setDoc, serverTimestamp, 
     collection, addDoc, query, orderBy, limit, onSnapshot as onCollectionSnapshot 
 } from 'firebase/firestore'; 
-// Đảm bảo đường dẫn này đúng với file config của bạn
 import { db } from '../firebase'; 
 
 export function useAudioSync() {
     const remoteCommand = ref<any>(null);
     
-    // MỚI: Biến chứa cảm xúc vừa nhận được
     const incomingReaction = ref<{ type: string, id: string } | null>(null);
 
     let unsubscribeRoom: (() => void) | null = null;
@@ -17,8 +15,6 @@ export function useAudioSync() {
 
     const joinRoom = (roomId: string, currentUserId: number | string) => {
         leaveRoom();
-
-        // 1. Lắng nghe Player State (Giữ nguyên)
         const docRef = doc(db, 'rooms', roomId, 'player', 'state');
         unsubscribeRoom = onSnapshot(docRef, (docSnap) => {
             if (docSnap.exists()) {
@@ -28,8 +24,7 @@ export function useAudioSync() {
             }
         });
 
-        // 2. Lắng nghe Reactions (MỚI)
-        // Chỉ lấy 1 reaction mới nhất thêm vào
+
         const reactionsRef = collection(db, 'rooms', roomId, 'reactions');
         const q = query(reactionsRef, orderBy('timestamp', 'desc'), limit(1));
         
@@ -37,7 +32,6 @@ export function useAudioSync() {
             snapshot.docChanges().forEach((change) => {
                 if (change.type === "added") {
                     const data = change.doc.data();
-                    // Cập nhật biến để View biết có reaction mới
                     incomingReaction.value = { type: data.type, id: change.doc.id };
                 }
             });

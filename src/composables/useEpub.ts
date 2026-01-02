@@ -105,14 +105,12 @@ export function useEpub() {
         rendition.value.themes.font(settings.fontName);
         rendition.value.themes.fontSize(settings.fontSize + "%");
 
-        // Inject CSS trực tiếp (Override style mặc định của sách)
         rendition.value.themes.default({    
             'body': { 
                 'color': `${settings.color} !important`, 
                 'background': `${settings.bg} !important`,
-                'padding': '0 20px !important', // Tạo lề cho dễ đọc
+                'padding': '0 20px !important', 
                 
-                // BẮT BUỘC: Cho phép chọn văn bản (mặc định epub chặn cái này)
                 '-webkit-user-select': 'text !important', 
                 'user-select': 'text !important',         
                 'cursor': 'auto !important'
@@ -122,20 +120,17 @@ export function useEpub() {
                 'line-height': `${settings.lineHeight} !important`,
                 'font-size': `${settings.fontSize}% !important`,
                 'text-align': 'justify !important',
-                // BẮT BUỘC cho thẻ P
                 '-webkit-user-select': 'text !important', 
                 'user-select': 'text !important'
             },
-            // Màu khi bôi đen (Selection)
             '::selection': {
                 'background': 'rgba(66, 135, 245, 0.3)' 
             },
-            // Style cho Highlight đã lưu
             '.highlight-default': {
                 'fill': 'yellow',
                 'fill-opacity': '0.3',
                 'mix-blend-mode': 'multiply',
-                'cursor': 'pointer' // Hiện bàn tay khi hover vào highlight
+                'cursor': 'pointer' 
             },
             '.highlight-default:hover': {
                 'fill-opacity': '0.5',
@@ -146,11 +141,9 @@ export function useEpub() {
     const resizeBook = (width: number, height: number, viewMode: 'single' | 'double') => {
         if (!rendition.value || width === 0 || height === 0) return;
         rendition.value.resize(width, height);
-        // spread('none') = 1 trang, spread('auto') = 2 trang (nếu đủ rộng)
         rendition.value.spread(viewMode === 'single' ? "none" : "auto");
     };
 
-    // --- 4. QUẢN LÝ HIGHLIGHT & NOTES ---
 
     const drawAnnotations = (highlights: AnnotationItem[], notes: AnnotationItem[]) => {
         if (!rendition.value) return;
@@ -158,26 +151,22 @@ export function useEpub() {
         console.log(`🖊️ Vẽ lại ${highlights.length} highlight và ${notes.length} note.`);
         const annotations = rendition.value.annotations;
         
-        // Gộp chung để xử lý
         const allItems = [...highlights, ...notes];
 
-        // Bước 1: Xóa các highlight cũ đang hiển thị (để tránh vẽ đè lên nhau)
         allItems.forEach(item => {
             try { 
                 annotations.remove(item.cfi_range, 'highlight'); 
-            } catch (e) { /* Bỏ qua lỗi nếu chưa tồn tại */ }
+            } catch (e) {}
         });
 
-        // Bước 2: Vẽ lại danh sách mới nhất
         allItems.forEach((item) => {
             try {
                 annotations.add(
                     'highlight', 
                     item.cfi_range, 
-                    // Truyền data vào để khi click có thể lấy lại ID
                     { id: item.id, type: item.type, text_content: item.text_content }, 
                     undefined, 
-                    'highlight-default' // Class CSS đã định nghĩa ở setStyle
+                    'highlight-default'
                 );
             } catch (e) {
                 console.warn(`Lỗi vẽ item ID ${item.id}`, e);
